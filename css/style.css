@@ -806,3 +806,11 @@ button, .unit, .pcard, .door { -webkit-tap-highlight-color: transparent; }
 /* ชื่อมอนแสดงเฉพาะตอนเลือกเป้าหมาย (ปกติดูในกล่องมุมซ้ายบน) */
 .scene .mu .u-name { display: none; }
 .scene .mu.targetable .u-name, .scene .mu:hover .u-name { display: block; }
+
+/* ---------- โหมด 3D (Three.js) ---------- */
+.sc-3d { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; display: block; }
+.scene.three .u-sprite > svg { visibility: hidden; }
+.scene.three .sc-plat { visibility: hidden; }
+.scene.three .unit.pu.ko::after { display: none; }
+.scene.three .u-ring { opacity: .8; }
+.scene.three .unit.active .u-ring { box-shadow: 0 0 2.4cqw var(--c), 0 0 1cqw var(--c); }

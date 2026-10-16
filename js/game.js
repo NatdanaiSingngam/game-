@@ -868,6 +868,7 @@ function renderBattle() {
     <div class="party-cards compact" id="cards"></div>
     <div class="win log"><div class="win-title">Battle Log</div><div class="win-body" id="blog"></div></div>
   </section>`;
+  S3.mount($('#field'), th);
   refreshAll();
 }
 
@@ -931,6 +932,7 @@ function layoutScene() {
     setPos(p, x, y, bw, Math.round(y) - 10);
     unitNode(p)?.classList.remove('hero');
   });
+  S3.sync([...S.players, ...ms]);
 }
 
 function hpBar(v, max, kind) {
@@ -1226,13 +1228,14 @@ function openBoard() {
 }
 
 function openMenu() {
+  const gfx = S3.canWebGL() ? `<button class="btn" data-menu="gfx">🎨 กราฟิก: ${S3.wants3d() ? '3D (กดเพื่อใช้ 2D)' : '2D (กดเพื่อใช้ 3D)'}</button>` : '';
   const fs = document.fullscreenEnabled ? `<button class="btn" data-menu="full">⛶ ${document.fullscreenElement ? 'ออกจากเต็มจอ' : 'เล่นแบบเต็มจอ'}</button>` : '';
   openPanel(`<div class="board menu"><button class="x" data-close>✕</button>
     <h2>☰ เมนู</h2>
     ${isOnline() ? `<p class="muted">ห้อง <b>${esc(NET.code)}</b> · ${NET.mode === 'host' ? 'คุณเป็นหัวห้อง (บันทึกอัตโนมัติ)' : 'เชื่อมต่อกับหัวห้องอยู่'}</p>
-      <button class="btn" data-net="share">🔗 แชร์ลิงก์ห้อง</button>${fs}
+      <button class="btn" data-net="share">🔗 แชร์ลิงก์ห้อง</button>${gfx}${fs}
       <button class="btn red" data-net="leave">🚪 ${NET.mode === 'host' ? 'ปิดห้อง' : 'ออกจากห้อง'}</button>`
-    : `<p class="muted">เกมบันทึกอัตโนมัติทุกครั้งที่กลับมาหน้าแผนที่</p>${fs}
+    : `<p class="muted">เกมบันทึกอัตโนมัติทุกครั้งที่กลับมาหน้าแผนที่</p>${gfx}${fs}
       <button class="btn red" data-menu="new">🔁 เริ่มเกมใหม่ (ลบเซฟ)</button>`}
     <button class="btn" data-close>ปิด</button></div>`);
 }
@@ -1265,6 +1268,13 @@ document.addEventListener('click', e => {
   // หน้าต่าง
   if (c('[data-close]') || t.id === 'panel') { closePanel(); return; }
   if ((n = c('[data-stat]'))) { addStat(n.dataset.stat); return; }
+  if (c('[data-menu="gfx"]')) {
+    S3.setMode(S3.wants3d() ? '2d' : '3d');
+    closePanel();
+    if (B && $('#field')) renderBattle();
+    toast(S3.wants3d() ? '🎨 ใช้กราฟิก 3D' : '🎨 ใช้กราฟิก 2D (ลื่นกว่าบนมือถือรุ่นเก่า)');
+    return;
+  }
   if (c('[data-menu="full"]')) {
     closePanel();
     if (document.fullscreenElement) document.exitFullscreen?.(); else document.documentElement.requestFullscreen?.().catch(() => {});
