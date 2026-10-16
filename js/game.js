@@ -128,7 +128,7 @@ function renderSetup() {
         <li>เทิร์นนับตาม <b>SPD</b> (AGI สูง = ได้เล่นถี่) ดูลำดับได้ที่แถบด้านบนสนาม</li>
         <li>สกิลมี <b>คูลดาวน์</b> ใช้แล้วต้องรอตามจำนวนเทิร์น · จำนวนมอนเพิ่มตามขนาดปาร์ตี้ (8 คน ≈ 6 ตัว)</li>
         <li>เลเวลอัพได้ <b>+3 แต้มสเตตัส</b> กดที่การ์ดผู้เล่นเพื่ออัพ STR / AGI / VIT / INT / DEX / LUK</li>
-        <li>💀 <b>HP หมด</b> → ยก 1 แก้ว แล้ว<b>นอนตายจนกว่าจะลงชั้นถัดไป</b> (ตายหมดทีม = ยกเพิ่มคนละ ½ แก้ว) · 💧 <b>มานาหมด</b> (SP ไม่พอใช้สกิลที่ถูกสุด) → ยก ¼ แก้ว ได้ +10 SP</li>
+        <li>💀 <b>HP หมด</b> → ยก 1 แก้ว แล้ว<b>นอนตายจนกว่าจะลงชั้นถัดไป</b> (ตายหมดทีม = ยกเพิ่มคนละ ½ แก้ว) · 💧 <b>มานาหมด (SP เหลือ 0)</b> → ยก ¼ แก้ว ได้ +10 SP · ถ้า SP ไม่พอใช้สกิล จะกดยก ¼ แก้วเติมเองก็ได้</li>
         <li>ดื่มอย่างรับผิดชอบ รู้ลิมิตตัวเอง ห้ามขับขี่ 🚫🚗</li>
       </ul></div></div>
   </section>`;
@@ -757,9 +757,8 @@ async function resolveDrinks() {
     refreshAll();
     await wait(500);
   }
-  // มานาหมด = SP ไม่พอใช้สกิลที่ถูกที่สุด (บังคับดื่มครั้งเดียว จนกว่า SP จะกลับมาพอใช้)
-  S.players.forEach(p => { if (p.sp >= minSkillCost(p)) p.dry = false; });
-  const dry = alivePlayers().filter(p => !p.dry && p.sp < minSkillCost(p));
+  // มานาหมด = SP เหลือ 0 จริงๆ เท่านั้น (SP ไม่พอใช้สกิล กดยก ¼ แก้วเติมเองได้)
+  const dry = alivePlayers().filter(p => p.sp <= 0);
   if (dry.length) {
     await showModal({
       icon: '💧🍺', cls: 'drink', allow: owners(dry),
@@ -769,7 +768,6 @@ async function resolveDrinks() {
     });
     dry.forEach(p => {
       p.glasses += 0.25;
-      p.dry = true;
       p.sp = Math.min(derive(p).maxSp, p.sp + 10);
       popNum(p, '+10 SP', 'sp');
       log(`💧 ${nm(p)} ยก ¼ แก้ว +10 SP (รวม ${fmtGlass(p.glasses)} แก้ว)`);
