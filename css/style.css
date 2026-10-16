@@ -622,3 +622,58 @@ button, .unit, .pcard, .door { -webkit-tap-highlight-color: transparent; }
   .skill { flex: 0 0 auto; width: 150px; }
   .s-txt .desc { display: none; }
 }
+
+/* ---------- ออนไลน์ ---------- */
+.tabs { display: flex; gap: 6px; background: #0006; padding: 5px; border-radius: 14px; border: 1px solid #ffffff1a; margin: 4px 0 12px; }
+.tab { flex: 1; border: 0; border-radius: 10px; padding: 10px 8px; background: transparent; cursor: pointer; font-weight: 500; color: var(--muted); }
+.tab.on { background: linear-gradient(#ffe07a, #f0a92a); color: #3a2400; box-shadow: 0 2px 10px #ffcc3d55; }
+.online-box { display: flex; flex-direction: column; gap: 10px; max-width: 460px; margin: 0 auto; }
+.online-box .btn.big { width: 100%; }
+.fld { display: flex; flex-direction: column; gap: 4px; font-size: .85rem; color: var(--muted); }
+.fld input, .join-row input {
+  background: #0006; border: 1px solid #ffffff2a; border-radius: 10px; color: var(--text); font: inherit; font-size: 1.05rem; padding: 10px 12px; min-width: 0;
+}
+.fld input:focus, .join-row input:focus { outline: 2px solid var(--gold); }
+.join-row { display: flex; gap: 8px; }
+.join-row input { flex: 1; text-transform: uppercase; letter-spacing: .3em; font-weight: 600; text-align: center; }
+.or { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: .8rem; }
+.or::before, .or::after { content: ''; flex: 1; height: 1px; background: #ffffff22; }
+.net-msg { min-height: 1.2em; margin: 0; text-align: center; color: #ffb3bd; }
+.room-code { letter-spacing: .25em; font-weight: 600 !important; color: var(--gold); font-size: 1.6rem !important; }
+.devices { display: flex; flex-wrap: wrap; gap: 6px; }
+.dev { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 99px; background: #0005; border: 1px solid #ffffff1f; color: var(--muted); }
+.dev i { width: 8px; height: 8px; border-radius: 50%; background: #666; }
+.dev.on { color: var(--text); }
+.dev.on i { background: #3ddc84; box-shadow: 0 0 6px #3ddc84; }
+.dev small { color: var(--muted); }
+.add-card { justify-content: center; cursor: pointer; border-style: dashed !important; border-top-width: 1px !important; color: var(--muted); min-height: 180px; --c: #8f86b8; font: inherit; }
+.add-card span { font-size: 2rem; }
+.add-card small { color: var(--muted); }
+.add-card:hover { color: var(--text); filter: brightness(1.15); }
+.sc-del { position: absolute; top: 6px; right: 6px; width: 28px; height: 28px; border-radius: 50%; border: 0; background: #0006; cursor: pointer; }
+.party-preview { display: flex; flex-wrap: wrap; gap: 6px; }
+.party-preview .pchip { padding-right: 12px; }
+.party-preview .pchip small { color: #e8e2ffb0; font-weight: 300; margin-left: 2px; }
+.wait-host { text-align: center; padding: 14px; border-radius: 12px; background: #0006; color: var(--muted); animation: pulse 1.6s infinite; }
+.net-badge { font-weight: 600; letter-spacing: .08em; color: var(--gold); }
+.pc-me { position: absolute; top: -8px; left: 10px; font-size: .62rem; font-weight: 600; background: var(--c); color: #1c1731; padding: 0 7px; border-radius: 99px; z-index: 1; }
+.pcard.mine { box-shadow: inset 0 0 0 1px var(--c); }
+.pcard.offline { opacity: .6; }
+.pc-off { position: absolute; top: -6px; right: 4px; font-size: .9rem; }
+.m-note { margin-top: 10px; color: var(--muted); font-size: .85rem; animation: pulse 1.4s infinite; }
+.ap-wtxt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; max-width: 320px; }
+.ap-wait .btn.tiny { margin-left: auto; flex: none; }
+#netbar, #toast {
+  position: fixed; left: 50%; z-index: 80; transform: translate(-50%, -20px); opacity: 0; pointer-events: none;
+  padding: 8px 16px; border-radius: 99px; font-size: .85rem; font-weight: 500; white-space: nowrap; max-width: calc(100vw - 24px); overflow: hidden; text-overflow: ellipsis;
+  transition: opacity .25s, transform .25s; box-shadow: 0 6px 20px #000a;
+}
+#netbar { top: max(10px, env(safe-area-inset-top)); background: #c92d45; color: #fff; }
+#toast { top: max(54px, calc(env(safe-area-inset-top) + 44px)); background: #2a2347; border: 1px solid var(--gold); color: var(--text); }
+#netbar.show, #toast.show { opacity: 1; transform: translate(-50%, 0); }
+@media (max-width: 760px) {
+  .net-badge { padding: 7px 8px; font-size: .8rem; letter-spacing: 0; }
+  .room-code { font-size: 1.3rem !important; }
+  .add-card { min-height: 150px; }
+  .tab { font-size: .85rem; padding: 9px 4px; }
+}

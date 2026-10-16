@@ -80,6 +80,8 @@ const nm = u => `<b style="color:${u.side === 'p' ? u.color : '#ff8a8a'}">${esc(
 
 // ---------- บันทึกเกม ----------
 function save() {
+  if (NET.mode === 'host') return saveHost();
+  if (NET.mode === 'client') return;
   try { localStorage.setItem(SAVE_KEY, JSON.stringify({ floor: S.floor, deepest: S.deepest, players: S.players, rooms: S.rooms, need: S.need, uidSeq })); } catch (e) { /* ไม่มี storage ก็เล่นต่อได้ */ }
 }
 function loadSave() {
@@ -96,8 +98,11 @@ function initSetup() {
   }));
 }
 
+let setupTab = new URLSearchParams(location.search).get('room') ? 'online' : 'local';
+
 function renderSetup() {
   S = null; B = null;
+  NET.screen = 'setup';
   const sv = loadSave();
   app().innerHTML = `
   <section class="screen setup">
@@ -106,13 +111,15 @@ function renderSetup() {
       <h1>Monster Drink Battle</h1>
       <p>ลงดันเจี้ยนเป็นทีม · ตายยก <b>1 แก้ว</b> · มานาหมดยก <b>¼ แก้ว</b> (+10 SP)</p>
     </div>
+    <div class="tabs"><button class="tab ${setupTab === 'local' ? 'on' : ''}" data-tab="local">📱 เล่นเครื่องเดียว</button><button class="tab ${setupTab === 'online' ? 'on' : ''}" data-tab="online">🌐 ออนไลน์ (สร้างห้อง)</button></div>
+    ${setupTab === 'online' ? onlineSetupHTML() : `
     ${sv ? `<div class="win continue"><div class="win-title">บันทึกเกม</div><div class="win-body">
       <span>ปาร์ตี้ ${sv.players.length} คน · อยู่ชั้น <b>B${sv.floor}F</b> · ดื่มรวม ${fmtGlass(sv.players.reduce((a, p) => a + p.glasses, 0))} แก้ว</span>
       <button class="btn gold" id="btnContinue">▶ เล่นต่อ</button></div></div>` : ''}
     <div class="win"><div class="win-title">จำนวนคนในปาร์ตี้</div>
       <div class="win-body size-picker">${[2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => `<button class="chip ${n === partySize ? 'on' : ''}" data-size="${n}">${n}</button>`).join('')}</div></div>
     <div class="setup-grid" id="setupGrid"></div>
-    <div class="setup-actions"><button class="btn gold big" id="btnStart">⚔️ ลงดันเจี้ยน!</button></div>
+    <div class="setup-actions"><button class="btn gold big" id="btnStart">⚔️ ลงดันเจี้ยน!</button></div>`}
     <div class="win rules"><div class="win-title">กติกา</div><div class="win-body">
       <ul>
         <li>เลือกห้องในแต่ละชั้นได้เอง (สุ่ม 3–6 ห้อง) ต้องเคลียร์อย่างน้อย 2 ห้องก่อนบุกห้องบันไดลงชั้นถัดไป</li>
@@ -123,7 +130,7 @@ function renderSetup() {
         <li>ดื่มอย่างรับผิดชอบ รู้ลิมิตตัวเอง ห้ามขับขี่ 🚫🚗</li>
       </ul></div></div>
   </section>`;
-  renderSetupGrid();
+  if (setupTab === 'local') renderSetupGrid();
 }
 
 function renderSetupGrid() {
@@ -212,7 +219,7 @@ function renderMap() {
       <div class="floor-badge">B${S.floor}F</div>
       <div class="floor-info"><h2>${th.name}</h2>
         <p>เคลียร์แล้ว ${done}/${S.rooms.length - 1} ห้อง · ${locked ? `ต้องเคลียร์อีก ${S.need - done} ห้องก่อนลงบันได` : 'ห้องบันไดเปิดแล้ว!'}</p></div>
-      <div class="top-btns"><button class="btn" data-open="board">🍺<span class="hide-sm"> ตารางดื่ม</span></button><button class="btn" data-open="menu">☰</button></div>
+      <div class="top-btns">${netBadge()}<button class="btn" data-open="board">🍺<span class="hide-sm"> ตารางดื่ม</span></button><button class="btn" data-open="menu">☰</button></div>
     </div>
     <div class="dungeon">
       <div class="torch l">🔥</div><div class="torch r">🔥</div>
@@ -228,6 +235,7 @@ function renderMap() {
     <div class="section-title">ปาร์ตี้ ${S.players.length} คน <small>กดที่การ์ดเพื่อดูสเตตัส / อัพแต้ม</small></div>
     <div class="party-cards full">${S.players.map(p => playerCard(p, 'full')).join('')}</div>
   </section>`;
+  netSync();
 }
 
 async function enterRoom(id) {
@@ -235,8 +243,7 @@ async function enterRoom(id) {
   const r = S.rooms[id];
   if (!r || r.cleared || (isExit(r) && clearedCount() < S.need)) return;
   roomBusy = true;
-  const door = $(`.door[data-room="${id}"]`);
-  if (door) door.classList.add('opening');
+  doorAnim(id);
   await wait(650);
   if (['battle', 'elite', 'stairs', 'boss'].includes(r.type)) return startBattle(r);
   if (r.type === 'chest') return chestRoom(r);
@@ -315,12 +322,12 @@ function floorBanner() {
   return banner(`B${S.floor}F`, S.floor % 5 === 0 ? `${th.name} · ⚠️ ชั้นนี้มี MVP!` : th.name);
 }
 
-function banner(big, small) {
+const banner = V('banner', (big, small) => {
   const el = $('#banner');
   el.innerHTML = `<div class="bn-big">${big}</div><div class="bn-small">${small}</div>`;
   el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
   return wait(1700);
-}
+});
 
 // =====================================================================
 // มอนสเตอร์
@@ -431,7 +438,7 @@ function previewOrder(k) {
 
 async function startBattle(room) {
   const mons = genMonsters(room);
-  B = { room, mons, dmg: {}, busy: false, pending: null, actor: null, done: null };
+  B = { bid: ++uidSeq, room, mons, dmg: {}, busy: false, pending: null, actor: null, done: null, waiting: null, override: null };
   S.players.forEach(p => { p.effects = []; p.ct = rnd(0, 30); });
   mons.forEach(m => { m.ct = rnd(0, 30); });
   S.screen = 'battle';
@@ -493,8 +500,8 @@ async function startOfTurn(u) {
 }
 
 // ---------- ตาผู้เล่น ----------
-function playerTurn() {
-  return new Promise(res => { B.done = res; renderAction(); });
+function playerTurn(p) {
+  return new Promise(res => { B.done = res; B.waiting = p.id; B.override = null; renderAction(); netSync(); });
 }
 
 function minSkillCost(p) {
@@ -502,23 +509,51 @@ function minSkillCost(p) {
   return costs.length ? Math.min(...costs) : 0;
 }
 
+// เครื่องนี้สั่งตัวละครนี้ได้ไหม (ออนไลน์: เฉพาะตัวของตัวเอง หรือหัวห้องกด "เล่นแทน")
+function canControl(p) {
+  if (!B || !p || !isP(p) || B.busy) return false;
+  if (!(isMine(p) || (NET.mode === 'host' && B.override === p.id))) return false;
+  return NET.mode === 'client' ? B.waiting === p.id : !!B.done;
+}
+
 function chooseAction(key) {
   const p = B && B.actor;
-  if (!p || !isP(p) || B.busy || !B.done) return;
+  if (key === 'takeover') { if (NET.mode === 'host' && p && B.done) { B.override = p.id; renderAction(); } return; }
+  if (!canControl(p)) return;
   if (key === 'cancel') { B.pending = null; clearTargets(); renderAction(); return; }
-  if (key === 'defend') return runAction(() => doDefend(p));
-  if (key === 'drink') return voluntaryDrink(p);
+  if (key === 'defend') return commitAction(p, key, null);
+  if (key === 'drink') { if (p.sp < minSkillCost(p)) commitAction(p, key, null); return; }
   const sk = key === 'attack' ? ATTACK : SKILLS[key];
   if (!sk || (sk.lv && sk.lv > p.lv) || sk.sp > p.sp) return;
   if (sk.target === 'enemy') {
     const ms = liveMons();
-    if (ms.length === 1) return runAction(() => useSkill(p, key, ms[0]));
+    if (ms.length === 1) return commitAction(p, key, ms[0].id);
     B.pending = key; renderAction(); markTargets('enemy'); showFieldOnPhone();
   } else if (sk.target === 'ally') {
     B.pending = key; renderAction(); markTargets('ally'); showFieldOnPhone();
-  } else {
-    runAction(() => useSkill(p, key, null));
+  } else commitAction(p, key, null);
+}
+
+// เครื่องเพื่อนส่งคำสั่งไปให้หัวห้อง · หัวห้อง/เล่นเครื่องเดียวทำเลย
+function commitAction(p, key, targetId) {
+  if (NET.mode === 'client') {
+    netSend({ t: 'act', pid: p.id, key, target: targetId });
+    B.pending = null; B.busy = true;
+    clearTargets(); renderAction();
+    return;
   }
+  execAction(p, key, targetId);
+}
+
+function execAction(p, key, targetId) {
+  if (key === 'defend') return runAction(() => doDefend(p));
+  if (key === 'drink') return voluntaryDrink(p);
+  const sk = key === 'attack' ? ATTACK : (JOBS[p.job].skills.includes(key) ? SKILLS[key] : null);
+  if (!sk || (sk.lv && sk.lv > p.lv) || sk.sp > p.sp) return;
+  let t = null;
+  if (sk.target === 'enemy') { t = liveMons().find(m => m.id === targetId); if (!t) return; }
+  if (sk.target === 'ally') { t = S.players.find(x => x.id === targetId); if (!t) return; }
+  runAction(() => useSkill(p, key, t));
 }
 
 // บนมือถือ เลื่อนให้เห็นสนามตอนเลือกเป้าหมาย
@@ -530,18 +565,18 @@ function showFieldOnPhone() {
 }
 
 function onTargetClick(id) {
-  if (!B || !B.pending || B.busy) return;
+  if (!B || !B.pending || !canControl(B.actor)) return;
   const key = B.pending, sk = key === 'attack' ? ATTACK : SKILLS[key];
   const u = unitById(id);
   if (!u) return;
   if (sk.target === 'enemy' && (isP(u) || u.dead)) return;
   if (sk.target === 'ally' && !isP(u)) return;
-  runAction(() => useSkill(B.actor, key, u));
+  commitAction(B.actor, key, u.id);
 }
 
 async function runAction(fn) {
-  B.busy = true; B.pending = null;
-  clearTargets(); renderAction();
+  B.busy = true; B.pending = null; B.waiting = null; B.override = null;
+  clearTargets(); renderAction(); netSync();
   await fn();
   B.busy = false;
   const d = B.done; B.done = null;
@@ -549,12 +584,14 @@ async function runAction(fn) {
 }
 
 async function voluntaryDrink(p) {
-  if (p.sp >= minSkillCost(p)) return;
-  await showModal({ icon: '💧🍺', title: `${esc(p.name)} เติมมานา`, html: `ยก <b>¼ แก้ว</b> รับ <b>+10 SP</b>`, cls: 'drink', buttons: [{ label: '🍺 ยกแล้ว! (+10 SP)', cls: 'gold' }] });
+  if (p.sp >= minSkillCost(p) || B.busy) return;
+  B.busy = true; renderAction(); netSync();
+  await showModal({ icon: '💧🍺', title: `${esc(p.name)} เติมมานา`, html: `ยก <b>¼ แก้ว</b> รับ <b>+10 SP</b>`, cls: 'drink', allow: owners([p]), buttons: [{ label: '🍺 ยกแล้ว! (+10 SP)', cls: 'gold' }] });
   p.glasses += 0.25;
   p.sp = Math.min(derive(p).maxSp, p.sp + 10);
   popNum(p, '+10 SP', 'sp');
   log(`🍺 ${nm(p)} ยก ¼ แก้ว +10 SP`);
+  B.busy = false;
   refreshAll();
 }
 
@@ -672,12 +709,10 @@ async function killMons(list, killer) {
   list.forEach(m => {
     m.dead = true;
     if (killer && isP(killer)) killer.kills++;
-    const n = unitNode(m);
-    if (n) n.classList.add('dying');
     log(`💀 ${nm(m)} ถูกกำจัด! (+${m.exp} EXP)`);
   });
+  dieAnim(list);
   await wait(700);
-  list.forEach(m => { const n = unitNode(m); if (n) n.remove(); });
   refreshAll();
 }
 
@@ -685,11 +720,12 @@ async function killMons(list, killer) {
 async function resolveDrinks() {
   const dead = S.players.filter(p => p.hp <= 0);
   if (dead.length) {
-    dead.forEach(p => { p.deaths++; const n = unitNode(p); if (n) n.classList.add('ko'); });
+    dead.forEach(p => { p.deaths++; });
+    koAnim(dead, true);
     refreshAll();
     await wait(400);
     await showModal({
-      icon: '💀🍺', cls: 'drink',
+      icon: '💀🍺', cls: 'drink', allow: owners(dead),
       title: dead.length > 1 ? `${dead.length} คนตาย!` : `${esc(dead[0].name)} ตาย!`,
       html: `${chipList(dead)}<p>ยก <b>1 แก้ว</b> ให้หมด แล้วฟื้นคืนชีพ HP/SP เต็ม</p>`,
       buttons: [{ label: '🍺 ยกหมดแล้ว!', cls: 'gold' }],
@@ -697,10 +733,10 @@ async function resolveDrinks() {
     dead.forEach(p => {
       const d = derive(p);
       p.glasses += 1; p.hp = d.maxHp; p.sp = d.maxSp; p.effects = []; p.ct = 0;
-      const n = unitNode(p); if (n) n.classList.remove('ko');
       fxAt(p, 'revive'); popNum(p, 'Resurrection!', 'heal');
       log(`😇 ${nm(p)} ยก 1 แก้ว ฟื้นคืนชีพ! (รวม ${fmtGlass(p.glasses)} แก้ว)`);
     });
+    koAnim(dead, false);
     refreshAll();
     await wait(600);
   }
@@ -709,7 +745,7 @@ async function resolveDrinks() {
   const dry = S.players.filter(p => !p.dry && p.sp < minSkillCost(p));
   if (dry.length) {
     await showModal({
-      icon: '💧🍺', cls: 'drink',
+      icon: '💧🍺', cls: 'drink', allow: owners(dry),
       title: dry.length > 1 ? `${dry.length} คนมานาหมด!` : `${esc(dry[0].name)} มานาหมด!`,
       html: `${chipList(dry)}<p>ยก <b>¼ แก้ว</b> รับ <b>+10 SP</b></p>`,
       buttons: [{ label: '🍺 ยกแล้ว! (+10 SP)', cls: 'gold' }],
@@ -724,7 +760,10 @@ async function resolveDrinks() {
     refreshAll();
     await wait(300);
   }
+  if (dead.length || dry.length) netSync();
 }
+
+const owners = ps => [...new Set(ps.map(p => p.owner).filter(Boolean))];
 
 function chipList(ps) {
   return `<div class="chips">${ps.map(p => `<span class="pchip" style="--c:${p.color}">${chibi(p, { crop: 'head' })}${esc(p.name)}</span>`).join('')}</div>`;
@@ -775,12 +814,12 @@ function renderBattle() {
     <div class="topbar">
       <div class="floor-badge">B${S.floor}F</div>
       <div class="floor-info"><h2>${T.icon} ${T.name}</h2><p>${th.name}</p></div>
-      <div class="top-btns"><button class="btn" id="btnSpeed">⏩ x${SPEED}</button><button class="btn" data-open="board">🍺</button></div>
+      <div class="top-btns">${netBadge()}${NET.mode !== 'client' ? `<button class="btn" id="btnSpeed">⏩ x${SPEED}</button>` : ''}<button class="btn" data-open="board">🍺</button><button class="btn" data-open="menu">☰</button></div>
     </div>
     <div class="timeline" id="timeline"></div>
     <div class="field" id="field">
       <div class="floor-plane"></div>
-      <div class="side mon-side" id="monSide">${B.mons.map(unitHTML).join('')}</div>
+      <div class="side mon-side" id="monSide">${liveMons().map(unitHTML).join('')}</div>
       <div class="side party-side n${S.players.length}" id="partySide">${S.players.map(unitHTML).join('')}</div>
     </div>
     <div class="action" id="action"></div>
@@ -822,6 +861,7 @@ function refreshAll() {
   renderTimeline();
   renderAction();
   if (B.pending) markTargets((B.pending === 'attack' ? ATTACK : SKILLS[B.pending]).target === 'ally' ? 'ally' : 'enemy');
+  netSync();
 }
 
 function renderTimeline() {
@@ -840,7 +880,9 @@ function bar(kind, v, max, label) {
 function playerCard(p, mode) {
   const d = derive(p), J = JOBS[p.job];
   const active = B && B.actor === p;
-  return `<div class="pcard ${mode} ${active ? 'active' : ''} ${p.hp <= 0 ? 'ko' : ''}" data-pid="${p.id}" style="--c:${p.color}">
+  const mine = isOnline() && isMine(p), off = isOnline() && p.owner && p.owner !== NET.myId && !NET.online.has(p.owner);
+  return `<div class="pcard ${mode} ${active ? 'active' : ''} ${p.hp <= 0 ? 'ko' : ''} ${mine ? 'mine' : ''} ${off ? 'offline' : ''}" data-pid="${p.id}" style="--c:${p.color}">
+    ${mine ? '<span class="pc-me">คุณ</span>' : ''}${off ? '<span class="pc-off" title="ออฟไลน์">💤</span>' : ''}
     <div class="pc-ava">${chibi(p, { crop: 'head' })}</div>
     <div class="pc-main">
       <div class="pc-top"><b class="pc-name">${esc(p.name)}</b><span class="pc-lv">Lv${p.lv}</span></div>
@@ -861,7 +903,16 @@ function renderAction() {
     el.innerHTML = `<div class="ap-wait"><div class="ap-ava m">${monSprite(u, { crop: 'head' })}</div><div><b>ตาของ ${esc(u.name)}</b><small>มอนสเตอร์กำลังเคลื่อนไหว...</small></div></div>`;
     return;
   }
-  const d = derive(u), J = JOBS[u.job], lock = B.busy || !B.done;
+  const d = derive(u), J = JOBS[u.job];
+  el.style.setProperty('--c', u.color);
+  if (!(isMine(u) || (NET.mode === 'host' && B.override === u.id))) {
+    const off = u.owner && u.owner !== NET.myId && !NET.online.has(u.owner);
+    el.innerHTML = `<div class="ap-wait"><div class="ap-ava">${chibi(u, { crop: 'head' })}</div>
+      <div class="ap-wtxt"><b>ตาของ ${esc(u.name)}</b><small>${off ? '💤 ออฟไลน์ · ' : ''}รอ ${esc(devName(u.owner))} เลือกท่า...</small>${bar('hp', u.hp, d.maxHp)}</div>
+      ${NET.mode === 'host' && B.done && !B.busy ? '<button class="btn tiny" data-act="takeover">🎮 เล่นแทน</button>' : ''}</div>`;
+    return;
+  }
+  const lock = !canControl(u);
   const minCost = minSkillCost(u);
   const pend = B.pending ? (B.pending === 'attack' ? ATTACK : SKILLS[B.pending]) : null;
   const skBtn = (k, s) => {
@@ -902,7 +953,7 @@ const FX = {
   claw: ['💢', '#ff4b4b'], drain: ['🌀', '#4fa3ff'], revive: ['😇', '#fff6b0'], lvup: ['🌟', '#ffd34d'],
 };
 
-function fxAt(u, kind) {
+const fxAt = V('fxAt', (u, kind) => {
   const n = unitNode(u); if (!n) return;
   const [emo, col] = FX[kind] || FX.impact;
   const f = document.createElement('div');
@@ -910,9 +961,9 @@ function fxAt(u, kind) {
   f.innerHTML = `<i class="burst" style="--fc:${col}"></i><i class="ring" style="--fc:${col}"></i><b>${emo}</b>`;
   n.appendChild(f);
   setTimeout(() => f.remove(), 1100 / SPEED + 200);
-}
+});
 
-function popNum(u, text, type) {
+const popNum = V('popNum', (u, text, type) => {
   const n = unitNode(u); if (!n) return;
   const d = document.createElement('div');
   d.className = `num ${type}`;
@@ -920,19 +971,28 @@ function popNum(u, text, type) {
   d.textContent = text;
   n.appendChild(d);
   setTimeout(() => d.remove(), (type === 'lvup' ? 2200 : 1300) / SPEED + 200);
-}
+});
 
 function retrigger(node, cls, ms) {
   if (!node) return;
   node.classList.remove(cls); void node.offsetWidth; node.classList.add(cls);
   setTimeout(() => node.classList.remove(cls), ms / SPEED + 50);
 }
-const lunge = u => retrigger(unitNode(u), isP(u) ? 'lunge-l' : 'lunge-r', 480);
-const hitFlash = u => retrigger(unitNode(u)?.querySelector('.u-body'), 'hit', 380);
-const castAnim = u => retrigger(unitNode(u), 'cast', 600);
-const shake = () => retrigger($('#field'), 'shake', 520);
+const lunge = V('lunge', u => retrigger(unitNode(u), isP(u) ? 'lunge-l' : 'lunge-r', 480));
+const hitFlash = V('hitFlash', u => retrigger(unitNode(u)?.querySelector('.u-body'), 'hit', 380));
+const castAnim = V('castAnim', u => retrigger(unitNode(u), 'cast', 600));
+const shake = V('shake', () => retrigger($('#field'), 'shake', 520));
+const koAnim = V('koAnim', (list, on) => list.forEach(u => unitNode(u)?.classList.toggle('ko', !!on)));
+const dieAnim = V('dieAnim', list => {
+  list.forEach(m => unitNode(m)?.classList.add('dying'));
+  setTimeout(() => list.forEach(m => unitNode(m)?.remove()), 700 / SPEED);
+});
+const doorAnim = V('doorAnim', id => {
+  $(`.door[data-room="${id}"]`)?.classList.add('opening');
+  if (NET.mode === 'client') { NET.doorBusy = true; setTimeout(() => { NET.doorBusy = false; }, 1200); }
+});
 
-async function callout(u, text) {
+const callout = V('callout', async (u, text) => {
   const n = unitNode(u); if (!n) return;
   const c = document.createElement('div');
   c.className = 'callout';
@@ -940,28 +1000,30 @@ async function callout(u, text) {
   n.appendChild(c);
   await wait(650);
   setTimeout(() => c.remove(), 400);
-}
+});
 
-function log(html) {
+const log = V('log', html => {
   const el = $('#blog'); if (!el) return;
   const d = document.createElement('div');
   d.innerHTML = html;
   el.prepend(d);
   while (el.children.length > 60) el.lastChild.remove();
-}
+});
 
 // =====================================================================
 // โมดอล / หน้าต่าง
 // =====================================================================
-function showModal({ icon, title, html, buttons, cls }) {
-  return new Promise(res => {
-    const m = $('#modal');
-    m.innerHTML = `<div class="mbox ${cls || ''}"><div class="m-icon">${icon || ''}</div><h2>${title}</h2><div class="m-body">${html || ''}</div>
-      <div class="m-btns">${buttons.map((b, i) => `<button class="btn ${b.cls || ''}" data-mi="${i}">${b.label}</button>`).join('')}</div></div>`;
-    m.classList.add('show');
-    m.querySelectorAll('[data-mi]').forEach(b => b.onclick = () => { m.classList.remove('show'); res(+b.dataset.mi); });
-  });
+function renderModalUI(o, can, onPick) {
+  const m = $('#modal');
+  m.innerHTML = `<div class="mbox ${o.cls || ''}"><div class="m-icon">${o.icon || ''}</div><h2>${o.title}</h2><div class="m-body">${o.html || ''}</div>
+    ${o.note ? `<div class="m-note">${o.note}</div>` : ''}
+    <div class="m-btns">${o.buttons.map((b, i) => `<button class="btn ${b.cls || ''}" data-mi="${i}" ${can ? '' : 'disabled'}>${b.label}</button>`).join('')}</div></div>`;
+  m.classList.add('show');
+  m.querySelectorAll('[data-mi]').forEach(b => { b.onclick = () => onPick(+b.dataset.mi); });
 }
+function closeModalUI() { $('#modal').classList.remove('show'); }
+function localModal(o) { return new Promise(res => renderModalUI(o, true, i => { closeModalUI(); res(i); })); }
+function showModal(o) { return NET.mode === 'host' ? netModal(o) : localModal(o); }
 
 function openPanel(html) {
   const p = $('#panel');
@@ -988,7 +1050,7 @@ function openSheet(pid) {
     <div class="sh-right">
       <div class="win-title">สเตตัส <span class="pts">แต้มเหลือ <b>${p.points}</b></span></div>
       <div class="stat-list">${STATS.map(s => `<div class="stat-row"><b>${STAT_INFO[s].label}</b><span class="sv">${p.stats[s]}</span>
-        <button class="plus" data-stat="${s}" ${p.points ? '' : 'disabled'} aria-label="เพิ่ม ${STAT_INFO[s].label}">+</button><small>${STAT_INFO[s].desc}</small></div>`).join('')}</div>
+        <button class="plus" data-stat="${s}" ${p.points && (NET.mode !== 'client' || isMine(p)) ? '' : 'disabled'} aria-label="เพิ่ม ${STAT_INFO[s].label}">+</button><small>${STAT_INFO[s].desc}</small></div>`).join('')}</div>
       <div class="derived">${[['HP', d.maxHp], ['SP', d.maxSp], ['ATK', d.atk], ['MATK', d.matk], ['DEF', d.def], ['MDEF', d.mdef], ['SPD', d.spd], ['CRIT', d.crit + '%'], ['FLEE', d.flee + '%']]
         .map(([k, v]) => `<div><small>${k}</small><b>${v}</b></div>`).join('')}</div>
       <div class="win-title">สกิล</div>
@@ -1000,13 +1062,19 @@ function openSheet(pid) {
 
 function addStat(s) {
   const p = S.players.find(x => x.id === sheetPid);
-  if (!p || p.points <= 0) return;
+  if (!p || p.points <= 0 || !STATS.includes(s)) return;
+  if (NET.mode === 'client') { if (isMine(p)) netSend({ t: 'stat', pid: p.id, s }); return; }
+  applyStat(p, s);
+}
+
+function applyStat(p, s) {
+  if (p.points <= 0) return;
   const before = derive(p);
   p.stats[s]++; p.points--;
   const after = derive(p);
   p.hp += after.maxHp - before.maxHp;
   p.sp += after.maxSp - before.maxSp;
-  openSheet(p.id);
+  if (sheetPid === p.id && $('#panel.show .sheet')) openSheet(p.id);
   if (S.screen === 'map') { renderMap(); save(); } else refreshAll();
 }
 
@@ -1026,11 +1094,14 @@ function openBoard() {
 }
 
 function openMenu() {
+  const fs = document.fullscreenEnabled ? `<button class="btn" data-menu="full">⛶ ${document.fullscreenElement ? 'ออกจากเต็มจอ' : 'เล่นแบบเต็มจอ'}</button>` : '';
   openPanel(`<div class="board menu"><button class="x" data-close>✕</button>
     <h2>☰ เมนู</h2>
-    <p class="muted">เกมบันทึกอัตโนมัติทุกครั้งที่กลับมาหน้าแผนที่</p>
-    ${document.fullscreenEnabled ? `<button class="btn" data-menu="full">⛶ ${document.fullscreenElement ? 'ออกจากเต็มจอ' : 'เล่นแบบเต็มจอ'}</button>` : ''}
-    <button class="btn red" data-menu="new">🔁 เริ่มเกมใหม่ (ลบเซฟ)</button>
+    ${isOnline() ? `<p class="muted">ห้อง <b>${esc(NET.code)}</b> · ${NET.mode === 'host' ? 'คุณเป็นหัวห้อง (บันทึกอัตโนมัติ)' : 'เชื่อมต่อกับหัวห้องอยู่'}</p>
+      <button class="btn" data-net="share">🔗 แชร์ลิงก์ห้อง</button>${fs}
+      <button class="btn red" data-net="leave">🚪 ${NET.mode === 'host' ? 'ปิดห้อง' : 'ออกจากห้อง'}</button>`
+    : `<p class="muted">เกมบันทึกอัตโนมัติทุกครั้งที่กลับมาหน้าแผนที่</p>${fs}
+      <button class="btn red" data-menu="new">🔁 เริ่มเกมใหม่ (ลบเซฟ)</button>`}
     <button class="btn" data-close>ปิด</button></div>`);
 }
 
@@ -1041,6 +1112,11 @@ document.addEventListener('click', e => {
   const t = e.target;
   const c = sel => t.closest(sel);
   let n;
+
+  // ออนไลน์ / ล็อบบี้
+  if ((n = c('[data-tab]'))) { setupTab = n.dataset.tab; renderSetup(); return; }
+  if ((n = c('[data-net]'))) { netClick(n); return; }
+  if ((n = c('[data-lc]'))) { lobbyClick(n); return; }
 
   // หน้าตั้งค่า
   if ((n = c('[data-size]'))) { partySize = +n.dataset.size; $$('[data-size]').forEach(b => b.classList.toggle('on', b === n)); renderSetupGrid(); return; }
@@ -1064,15 +1140,19 @@ document.addEventListener('click', e => {
   }
   if ((n = c('[data-menu="new"]'))) {
     closePanel();
-    showModal({ icon: '🔁', title: 'เริ่มเกมใหม่?', html: 'ความคืบหน้าและสถิติการดื่มจะหายทั้งหมด', buttons: [{ label: 'ยกเลิก' }, { label: 'เริ่มใหม่', cls: 'red' }] })
+    localModal({ icon: '🔁', title: 'เริ่มเกมใหม่?', html: 'ความคืบหน้าและสถิติการดื่มจะหายทั้งหมด', buttons: [{ label: 'ยกเลิก' }, { label: 'เริ่มใหม่', cls: 'red' }] })
       .then(i => { if (i === 1) { clearSave(); B = null; renderSetup(); } });
     return;
   }
   if ((n = c('[data-open]'))) { n.dataset.open === 'board' ? openBoard() : openMenu(); return; }
-  if (c('#btnSpeed')) { SPEED = SPEED === 1 ? 2 : SPEED === 2 ? 3 : 1; c('#btnSpeed').textContent = `⏩ x${SPEED}`; return; }
+  if (c('#btnSpeed') && NET.mode !== 'client') { SPEED = SPEED === 1 ? 2 : SPEED === 2 ? 3 : 1; c('#btnSpeed').textContent = `⏩ x${SPEED}`; return; }
 
   // แผนที่
-  if ((n = c('.door[data-room]'))) { enterRoom(+n.dataset.room); return; }
+  if ((n = c('.door[data-room]'))) {
+    if (NET.mode === 'client') { if (S && S.screen === 'map' && !NET.doorBusy) netSend({ t: 'room', id: +n.dataset.room }); }
+    else enterRoom(+n.dataset.room);
+    return;
+  }
 
   // การต่อสู้
   if ((n = c('#action [data-act]'))) { chooseAction(n.dataset.act); return; }
@@ -1085,8 +1165,15 @@ document.addEventListener('click', e => {
 
 document.addEventListener('input', e => {
   const t = e.target;
+  if (t.classList.contains('lc-name')) { const ch = NET.myChars[+t.dataset.i]; if (ch) { ch.name = t.value.slice(0, 14) || 'ฮีโร่'; charsChanged(false); } return; }
   if (t.classList.contains('sc-name')) setupList[+t.dataset.i].name = t.value;
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.id === 'onCode') joinRoom();
+  if (e.key === 'Enter' && e.target.classList.contains('lc-name')) { e.target.blur(); renderLobby(); }
 });
 
 initSetup();
 renderSetup();
+autoRejoin();
