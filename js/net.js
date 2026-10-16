@@ -103,11 +103,13 @@ function cleanState(s) {
     if (!HEX.test(p.color)) p.color = PLAYER_COLORS[0];
     if (!HEX.test(p.hair)) p.hair = HAIR_COLORS[0];
     p.effects = Array.isArray(p.effects) ? p.effects : [];
+    p.cd = p.cd && typeof p.cd === 'object' ? p.cd : {};
   });
   if (s.B) s.B.mons.forEach(m => {
     if (!MON_SPRITES[m.sprite]) m.sprite = 'slime';
     Object.keys(m.colors || {}).forEach(k => { if (!HEX.test(m.colors[k])) m.colors[k] = '#888888'; });
     m.effects = Array.isArray(m.effects) ? m.effects : [];
+    m.cd = m.cd && typeof m.cd === 'object' ? m.cd : {};
   });
   return s;
 }

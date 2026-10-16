@@ -677,3 +677,20 @@ button, .unit, .pcard, .door { -webkit-tap-highlight-color: transparent; }
   .add-card { min-height: 150px; }
   .tab { font-size: .85rem; padding: 9px 4px; }
 }
+
+/* ---------- คูลดาวน์สกิล ---------- */
+.skill { position: relative; }
+.skill.cooling:disabled { opacity: .8; filter: grayscale(.6); }
+.skill.cooling::after {
+  content: attr(data-cd); position: absolute; inset: 0; display: grid; place-items: center; border-radius: inherit;
+  background: radial-gradient(circle, #000c 0 28%, #0007 60%); color: #fff; font-size: 1.7rem; font-weight: 600;
+  text-shadow: 0 0 8px #7cc4ff, 0 2px 0 #000; pointer-events: none;
+}
+.skill.cooling .cost { color: #7cc4ff; }
+
+/* ---------- ตายรอฟื้นชั้นหน้า ---------- */
+.unit.pu.ko::after { content: '🪦'; position: absolute; bottom: 26px; left: 50%; transform: translateX(-50%); font-size: 1.7rem; filter: drop-shadow(0 2px 3px #000); pointer-events: none; }
+.unit.pu.ko .u-ring { display: none; }
+.pc-dead { position: absolute; bottom: -7px; right: 8px; font-size: .6rem; font-weight: 500; background: #3a3348; color: #d7cfee; border: 1px solid #ffffff33; padding: 0 7px; border-radius: 99px; z-index: 1; white-space: nowrap; }
+.pcard.ko { filter: grayscale(1) brightness(.6); }
+@media (max-width: 760px) { .unit.pu.ko::after { font-size: 1.3rem; bottom: 20px; } }

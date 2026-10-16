@@ -66,34 +66,35 @@ const JOBS = {
 };
 
 // target: enemy | allEnemies | ally | party | self
+// cd: คูลดาวน์ = ต้องรอกี่เทิร์นของตัวเองก่อนใช้สกิลนี้ซ้ำ
 // kind: phys | magic | heal | buff
 const ATTACK = { key: 'attack', name: 'โจมตี', icon: '⚔️', sp: 0, target: 'enemy', kind: 'phys', mult: 1, fx: 'slash', desc: 'โจมตีปกติ ไม่ใช้ SP' };
 
 const SKILLS = {
-  bash:        { name: 'Bash', icon: '💥', lv: 1, sp: 10, target: 'enemy', kind: 'phys', mult: 2.2, fx: 'impact', desc: 'ฟาดหนัก 220% ATK' },
-  magnum:      { name: 'Magnum Break', icon: '🔥', lv: 5, sp: 18, target: 'allEnemies', kind: 'phys', mult: 1.3, fx: 'fire', desc: 'ระเบิดไฟรอบตัว 130% ใส่มอนทุกตัว' },
-  provoke:     { name: 'Provoke', icon: '😤', lv: 10, sp: 10, target: 'self', kind: 'buff', fx: 'shield', effects: [['taunt', 3], ['defUp', 3, 0.6]], desc: 'ยั่วยุ มอนตีแต่เรา 3 เทิร์น + DEF +60%' },
+  bash:        { name: 'Bash', icon: '💥', lv: 1, sp: 10, cd: 1, target: 'enemy', kind: 'phys', mult: 2.2, fx: 'impact', desc: 'ฟาดหนัก 220% ATK' },
+  magnum:      { name: 'Magnum Break', icon: '🔥', lv: 5, sp: 18, cd: 3, target: 'allEnemies', kind: 'phys', mult: 1.3, fx: 'fire', desc: 'ระเบิดไฟรอบตัว 130% ใส่มอนทุกตัว' },
+  provoke:     { name: 'Provoke', icon: '😤', lv: 10, sp: 10, cd: 4, target: 'self', kind: 'buff', fx: 'shield', effects: [['taunt', 3], ['defUp', 3, 0.6]], desc: 'ยั่วยุ มอนตีแต่เรา 3 เทิร์น + DEF +60%' },
 
-  firebolt:    { name: 'Fire Bolt', icon: '🔥', lv: 1, sp: 12, target: 'enemy', kind: 'magic', mult: 2.4, fx: 'fire', desc: 'ลูกไฟ 240% MATK' },
-  frost:       { name: 'Frost Diver', icon: '❄️', lv: 5, sp: 15, target: 'enemy', kind: 'magic', mult: 1.7, fx: 'ice', freeze: 0.5, desc: '170% MATK + 50% แช่แข็ง (ข้ามเทิร์น)' },
-  storm:       { name: 'Storm Gust', icon: '🌪️', lv: 10, sp: 32, target: 'allEnemies', kind: 'magic', mult: 1.6, fx: 'ice', freeze: 0.25, desc: 'พายุน้ำแข็ง 160% ใส่ทุกตัว + 25% แช่แข็ง' },
+  firebolt:    { name: 'Fire Bolt', icon: '🔥', lv: 1, sp: 12, cd: 1, target: 'enemy', kind: 'magic', mult: 2.4, fx: 'fire', desc: 'ลูกไฟ 240% MATK' },
+  frost:       { name: 'Frost Diver', icon: '❄️', lv: 5, sp: 15, cd: 2, target: 'enemy', kind: 'magic', mult: 1.7, fx: 'ice', freeze: 0.5, desc: '170% MATK + 50% แช่แข็ง (ข้ามเทิร์น)' },
+  storm:       { name: 'Storm Gust', icon: '🌪️', lv: 10, sp: 32, cd: 4, target: 'allEnemies', kind: 'magic', mult: 1.6, fx: 'ice', freeze: 0.25, desc: 'พายุน้ำแข็ง 160% ใส่ทุกตัว + 25% แช่แข็ง' },
 
-  doublestrafe:{ name: 'Double Strafe', icon: '🏹', lv: 1, sp: 10, target: 'enemy', kind: 'phys', mult: 1.2, hits: 2, fx: 'arrow', desc: 'ยิง 2 ดอก ดอกละ 120%' },
-  arrowshower: { name: 'Arrow Shower', icon: '🌧️', lv: 5, sp: 16, target: 'allEnemies', kind: 'phys', mult: 1.1, fx: 'arrow', desc: 'ฝนธนู 110% ใส่ทุกตัว' },
-  sharpshoot:  { name: 'Sharp Shooting', icon: '🎯', lv: 10, sp: 24, target: 'enemy', kind: 'phys', mult: 3.4, alwaysCrit: true, fx: 'arrow', desc: 'ยิงทะลุ 340% คริติคอลแน่นอน' },
+  doublestrafe:{ name: 'Double Strafe', icon: '🏹', lv: 1, sp: 10, cd: 1, target: 'enemy', kind: 'phys', mult: 1.2, hits: 2, fx: 'arrow', desc: 'ยิง 2 ดอก ดอกละ 120%' },
+  arrowshower: { name: 'Arrow Shower', icon: '🌧️', lv: 5, sp: 16, cd: 3, target: 'allEnemies', kind: 'phys', mult: 1.1, fx: 'arrow', desc: 'ฝนธนู 110% ใส่ทุกตัว' },
+  sharpshoot:  { name: 'Sharp Shooting', icon: '🎯', lv: 10, sp: 24, cd: 3, target: 'enemy', kind: 'phys', mult: 3.4, alwaysCrit: true, fx: 'arrow', desc: 'ยิงทะลุ 340% คริติคอลแน่นอน' },
 
-  heal:        { name: 'Heal', icon: '💚', lv: 1, sp: 10, target: 'ally', kind: 'heal', power: 1, fx: 'heal', desc: 'ฮีลเพื่อน 1 คน' },
-  holylight:   { name: 'Holy Light', icon: '🌟', lv: 3, sp: 12, target: 'enemy', kind: 'magic', mult: 2.2, fx: 'holy', desc: 'แสงศักดิ์สิทธิ์ 220% MATK' },
-  blessing:    { name: 'Blessing', icon: '😇', lv: 5, sp: 18, target: 'party', kind: 'buff', fx: 'buff', effects: [['atkUp', 3, 0.25]], desc: 'บัฟ ATK/MATK +25% ทั้งปาร์ตี้ 3 เทิร์น' },
-  sanctuary:   { name: 'Sanctuary', icon: '⛪', lv: 10, sp: 30, target: 'party', kind: 'heal', power: 0.7, fx: 'heal', desc: 'ฮีลทั้งปาร์ตี้' },
+  heal:        { name: 'Heal', icon: '💚', lv: 1, sp: 10, cd: 1, target: 'ally', kind: 'heal', power: 1, fx: 'heal', desc: 'ฮีลเพื่อน 1 คน' },
+  holylight:   { name: 'Holy Light', icon: '🌟', lv: 3, sp: 12, cd: 1, target: 'enemy', kind: 'magic', mult: 2.2, fx: 'holy', desc: 'แสงศักดิ์สิทธิ์ 220% MATK' },
+  blessing:    { name: 'Blessing', icon: '😇', lv: 5, sp: 18, cd: 4, target: 'party', kind: 'buff', fx: 'buff', effects: [['atkUp', 3, 0.25]], desc: 'บัฟ ATK/MATK +25% ทั้งปาร์ตี้ 3 เทิร์น' },
+  sanctuary:   { name: 'Sanctuary', icon: '⛪', lv: 10, sp: 30, cd: 4, target: 'party', kind: 'heal', power: 0.7, fx: 'heal', desc: 'ฮีลทั้งปาร์ตี้' },
 
-  envenom:     { name: 'Envenom', icon: '☠️', lv: 1, sp: 8, target: 'enemy', kind: 'phys', mult: 1.5, poison: 3, fx: 'poison', desc: '150% + ติดพิษ 3 เทิร์น' },
-  backstab:    { name: 'Back Stab', icon: '🔪', lv: 5, sp: 16, target: 'enemy', kind: 'phys', mult: 3.0, fx: 'slash', desc: 'แทงข้างหลัง 300%' },
-  hiding:      { name: 'Hiding', icon: '💨', lv: 10, sp: 10, target: 'self', kind: 'buff', fx: 'smoke', effects: [['hide', 1], ['atkUp', 2, 0.5]], desc: 'ซ่อนตัว มอนตีไม่ได้ + ATK +50%' },
+  envenom:     { name: 'Envenom', icon: '☠️', lv: 1, sp: 8, cd: 2, target: 'enemy', kind: 'phys', mult: 1.5, poison: 3, fx: 'poison', desc: '150% + ติดพิษ 3 เทิร์น' },
+  backstab:    { name: 'Back Stab', icon: '🔪', lv: 5, sp: 16, cd: 2, target: 'enemy', kind: 'phys', mult: 3.0, fx: 'slash', desc: 'แทงข้างหลัง 300%' },
+  hiding:      { name: 'Hiding', icon: '💨', lv: 10, sp: 10, cd: 4, target: 'self', kind: 'buff', fx: 'smoke', effects: [['hide', 1], ['atkUp', 2, 0.5]], desc: 'ซ่อนตัว มอนตีไม่ได้ + ATK +50%' },
 
-  mammonite:   { name: 'Mammonite', icon: '🪙', lv: 1, sp: 10, target: 'enemy', kind: 'phys', mult: 2.5, fx: 'coin', desc: 'ฟาดด้วยเหรียญ 250%' },
-  cartrev:     { name: 'Cart Revolution', icon: '🛒', lv: 5, sp: 16, target: 'allEnemies', kind: 'phys', mult: 1.4, fx: 'impact', desc: 'เหวี่ยงรถเข็น 140% ใส่ทุกตัว' },
-  loud:        { name: 'Loud Exclamation', icon: '📣', lv: 10, sp: 14, target: 'party', kind: 'buff', fx: 'buff', effects: [['atkUp', 3, 0.3]], desc: 'ตะโกนปลุกใจ ATK +30% ทั้งปาร์ตี้' },
+  mammonite:   { name: 'Mammonite', icon: '🪙', lv: 1, sp: 10, cd: 1, target: 'enemy', kind: 'phys', mult: 2.5, fx: 'coin', desc: 'ฟาดด้วยเหรียญ 250%' },
+  cartrev:     { name: 'Cart Revolution', icon: '🛒', lv: 5, sp: 16, cd: 3, target: 'allEnemies', kind: 'phys', mult: 1.4, fx: 'impact', desc: 'เหวี่ยงรถเข็น 140% ใส่ทุกตัว' },
+  loud:        { name: 'Loud Exclamation', icon: '📣', lv: 10, sp: 14, cd: 4, target: 'party', kind: 'buff', fx: 'buff', effects: [['atkUp', 3, 0.3]], desc: 'ตะโกนปลุกใจ ATK +30% ทั้งปาร์ตี้' },
 };
 
 const EFFECT_ICON = { taunt: '😤', defUp: '🛡️', atkUp: '⬆️', hide: '💨', poison: '☠️', freeze: '🧊', defend: '🛡️' };
@@ -127,14 +128,14 @@ const BOSSES = [
 
 const MON_SKILLS = {
   basic:     { name: 'โจมตี', kind: 'phys', mult: 1, fx: 'claw' },
-  poison:    { name: 'พ่นสปอร์พิษ', kind: 'magic', mult: 0.8, fx: 'poison', poison: 3 },
-  drain:     { name: 'ดูดมานา', kind: 'magic', mult: 0.6, fx: 'drain', drain: 14 },
-  smash:     { name: 'ทุบสุดแรง', kind: 'phys', mult: 1.8, fx: 'impact' },
-  fireball:  { name: 'ลูกไฟนรก', kind: 'magic', mult: 0.7, aoe: true, fx: 'fire' },
-  breath:    { name: 'ลมหายใจมังกร', kind: 'magic', mult: 0.9, aoe: true, fx: 'fire', shake: true },
-  quake:     { name: 'แผ่นดินไหว', kind: 'phys', mult: 0.75, aoe: true, fx: 'impact', shake: true, alwaysHit: true },
-  freezeall: { name: 'พายุหิมะ', kind: 'magic', mult: 0.6, aoe: true, fx: 'ice', freeze: 0.2 },
-  manaburn:  { name: 'เผามานาทั้งทีม', kind: 'magic', mult: 0.5, aoe: true, fx: 'drain', drain: 10, shake: true },
+  poison:    { name: 'พ่นสปอร์พิษ', cd: 2, kind: 'magic', mult: 0.8, fx: 'poison', poison: 3 },
+  drain:     { name: 'ดูดมานา', cd: 2, kind: 'magic', mult: 0.6, fx: 'drain', drain: 14 },
+  smash:     { name: 'ทุบสุดแรง', cd: 2, kind: 'phys', mult: 1.8, fx: 'impact' },
+  fireball:  { name: 'ลูกไฟนรก', cd: 3, kind: 'magic', mult: 0.7, aoe: true, fx: 'fire' },
+  breath:    { name: 'ลมหายใจมังกร', cd: 3, kind: 'magic', mult: 0.9, aoe: true, fx: 'fire', shake: true },
+  quake:     { name: 'แผ่นดินไหว', cd: 3, kind: 'phys', mult: 0.75, aoe: true, fx: 'impact', shake: true, alwaysHit: true },
+  freezeall: { name: 'พายุหิมะ', cd: 4, kind: 'magic', mult: 0.6, aoe: true, fx: 'ice', freeze: 0.2 },
+  manaburn:  { name: 'เผามานาทั้งทีม', cd: 4, kind: 'magic', mult: 0.5, aoe: true, fx: 'drain', drain: 10, shake: true },
 };
 
 // ---------- ดันเจี้ยน ----------

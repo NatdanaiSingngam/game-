@@ -58,12 +58,13 @@ function gainExp(p, x) {
   p.exp += x;
   let ups = 0;
   while (p.exp >= expNeed(p.lv)) { p.exp -= expNeed(p.lv); p.lv++; p.points += 3; ups++; }
-  if (ups) { const d = derive(p); p.hp = d.maxHp; p.sp = d.maxSp; }
+  if (ups && !p.dead) { const d = derive(p); p.hp = d.maxHp; p.sp = d.maxSp; }
   return ups;
 }
 
 function healParty(frac) {
   S.players.forEach(p => {
+    if (p.dead) return;
     const d = derive(p);
     p.hp = Math.min(d.maxHp, p.hp + Math.round(d.maxHp * frac));
     p.sp = Math.min(d.maxSp, p.sp + Math.round(d.maxSp * frac));
@@ -125,8 +126,9 @@ function renderSetup() {
         <li>เลือกห้องในแต่ละชั้นได้เอง (สุ่ม 3–6 ห้อง) ต้องเคลียร์อย่างน้อย 2 ห้องก่อนบุกห้องบันไดลงชั้นถัดไป</li>
         <li>ทุก 5 ชั้นจะเจอบอส <b>MVP</b> 👑 · ยิ่งลงลึก มอนยิ่งเลเวลสูงและโหดขึ้น</li>
         <li>เทิร์นนับตาม <b>SPD</b> (AGI สูง = ได้เล่นถี่) ดูลำดับได้ที่แถบด้านบนสนาม</li>
+        <li>สกิลมี <b>คูลดาวน์</b> ใช้แล้วต้องรอตามจำนวนเทิร์น · จำนวนมอนเพิ่มตามขนาดปาร์ตี้ (8 คน ≈ 6 ตัว)</li>
         <li>เลเวลอัพได้ <b>+3 แต้มสเตตัส</b> กดที่การ์ดผู้เล่นเพื่ออัพ STR / AGI / VIT / INT / DEX / LUK</li>
-        <li>💀 <b>HP หมด</b> → ยก 1 แก้ว แล้วฟื้นคืนชีพเต็ม · 💧 <b>มานาหมด</b> (SP ไม่พอใช้สกิลที่ถูกสุด) → ยก ¼ แก้ว ได้ +10 SP</li>
+        <li>💀 <b>HP หมด</b> → ยก 1 แก้ว แล้ว<b>นอนตายจนกว่าจะลงชั้นถัดไป</b> (ตายหมดทีม = ยกเพิ่มคนละ ½ แก้ว) · 💧 <b>มานาหมด</b> (SP ไม่พอใช้สกิลที่ถูกสุด) → ยก ¼ แก้ว ได้ +10 SP</li>
         <li>ดื่มอย่างรับผิดชอบ รู้ลิมิตตัวเอง ห้ามขับขี่ 🚫🚗</li>
       </ul></div></div>
   </section>`;
@@ -310,16 +312,18 @@ async function restRoom(r) {
 }
 
 async function nextFloor() {
+  const revived = S.players.filter(p => p.dead);
+  revived.forEach(p => { const d = derive(p); p.dead = false; p.hp = d.maxHp; p.sp = d.maxSp; p.effects = []; });
   S.floor++;
   S.deepest = Math.max(S.deepest, S.floor);
   genFloor();
   goMap();
-  await floorBanner();
+  await floorBanner(revived.length ? `😇 ${revived.length} คนฟื้นคืนชีพ` : '');
 }
 
-function floorBanner() {
+function floorBanner(extra) {
   const th = theme();
-  return banner(`B${S.floor}F`, S.floor % 5 === 0 ? `${th.name} · ⚠️ ชั้นนี้มี MVP!` : th.name);
+  return banner(`B${S.floor}F`, (S.floor % 5 === 0 ? `${th.name} · ⚠️ ชั้นนี้มี MVP!` : th.name) + (extra ? ` · ${extra}` : ''));
 }
 
 const banner = V('banner', (big, small) => {
@@ -346,17 +350,21 @@ function finalize(m) {
   return m;
 }
 
-// ปาร์ตี้ใหญ่ → มอนเลือดเยอะขึ้นและได้เทิร์นถี่ขึ้น
-const partyHp = () => 0.8 + S.players.length * 0.08;
+// ปาร์ตี้ใหญ่ → มอนเยอะขึ้น (8 คน ≈ 6 ตัว) และได้เทิร์นถี่ขึ้น
+const baseMonCount = () => Math.max(2, Math.round(S.players.length * 0.75));
+const partyHp = () => 0.85 + S.players.length * 0.03;
 const partySpd = () => 0.85 + S.players.length * 0.05;
+// มอนเยอะขึ้น → EXP ต่อตัวลดลง ให้เลเวลขึ้นเร็วเท่าเดิม
+const expScale = () => Math.min(1, 4 / baseMonCount());
+const MON_ATK = 1.6;
 
 function makeMon(key, lv, mod) {
   const t = MONSTERS[key];
   const m = {
     side: 'm', id: 'm' + (++uidSeq), key, name: t.name, sprite: t.sprite, colors: t.colors, lv,
     skills: [...(t.skills || [])], effects: [], ct: 0, dead: false,
-    maxHp: t.hp * (1 + 0.25 * (lv - 1)) * partyHp(), atk: t.atk * 1.4 * (1 + 0.15 * (lv - 1)),
-    def: t.def + lv * 0.6, spd: (t.spd + Math.floor(lv / 3)) * partySpd(), exp: 5 + lv * 3,
+    maxHp: t.hp * (1 + 0.25 * (lv - 1)) * partyHp(), atk: t.atk * MON_ATK * (1 + 0.15 * (lv - 1)),
+    def: t.def + lv * 0.6, spd: (t.spd + Math.floor(lv / 3)) * partySpd(), exp: (5 + lv * 3) * expScale(), cd: {},
   };
   if (mod === 'elite' || mod === 'guard') {
     m.elite = true;
@@ -372,21 +380,21 @@ function makeBoss(lv) {
   return finalize({
     side: 'm', id: 'm' + (++uidSeq), name: t.name, sprite: t.sprite, colors: t.colors, lv, boss: true,
     skills: [...t.skills], effects: [], ct: 0, dead: false,
-    maxHp: t.hp * (1 + 0.25 * (lv - 1)) * (0.3 + n * 0.12), atk: t.atk * 1.4 * (1 + 0.15 * (lv - 1)),
-    def: t.def + lv * 0.6, spd: (t.spd + Math.floor(lv / 3)) * partySpd(), exp: (5 + lv * 3) * 8,
+    maxHp: t.hp * (1 + 0.25 * (lv - 1)) * (0.3 + n * 0.12), atk: t.atk * MON_ATK * (1 + 0.15 * (lv - 1)),
+    def: t.def + lv * 0.6, spd: (t.spd + Math.floor(lv / 3)) * partySpd(), exp: (5 + lv * 3) * 8, cd: {},
   });
 }
 
 function genMonsters(room) {
   const n = S.players.length;
-  const count = clamp(1 + Math.round(n * 0.35) + ri(-1, 1), 1, 6);
+  const count = clamp(baseMonCount() + ri(-1, 1), 1, 8);
   const pool = monPool();
   const normal = k => Array.from({ length: k }, () => makeMon(pick(pool), ri(room.lvMin, room.lvMax - 1)));
   switch (room.type) {
     case 'battle': return Array.from({ length: count }, () => makeMon(pick(pool), ri(room.lvMin, room.lvMax)));
     case 'elite': return [makeMon(pick(pool), room.lvMax, 'elite'), ...normal(Math.max(0, count - 2))];
     case 'stairs': return [makeMon(pick(pool), room.lvMax, 'guard'), ...normal(Math.max(1, count - 2))];
-    case 'boss': return [makeBoss(room.lvMax), ...normal(Math.max(0, count - 3))];
+    case 'boss': return [makeBoss(room.lvMax), ...normal(Math.max(1, count - 3))];
     case 'chest': return [makeMon('mimic', room.lvMax, 'elite'), ...normal(Math.max(0, count - 3))];
   }
   return [];
@@ -398,7 +406,8 @@ function genMonsters(room) {
 const isP = u => u.side === 'p';
 const st = u => isP(u) ? derive(u) : u;
 const liveMons = () => B.mons.filter(m => !m.dead);
-const allUnits = () => [...S.players, ...liveMons()];
+const alivePlayers = () => S.players.filter(p => !p.dead);
+const allUnits = () => [...alivePlayers(), ...liveMons()];
 const spdOf = u => Math.max(1, st(u).spd);
 const unitById = id => allUnits().find(u => u.id === id) || (B && B.mons.find(m => m.id === id));
 const unitNode = u => document.querySelector(`.unit[data-uid="${u.id}"]`);
@@ -439,7 +448,7 @@ function previewOrder(k) {
 async function startBattle(room) {
   const mons = genMonsters(room);
   B = { bid: ++uidSeq, room, mons, dmg: {}, busy: false, pending: null, actor: null, done: null, waiting: null, override: null };
-  S.players.forEach(p => { p.effects = []; p.ct = rnd(0, 30); });
+  S.players.forEach(p => { p.effects = []; p.cd = {}; p.ct = rnd(0, 30); });
   mons.forEach(m => { m.ct = rnd(0, 30); });
   S.screen = 'battle';
   renderBattle();
@@ -458,7 +467,7 @@ async function battleLoop() {
     refreshAll();
     const skip = await startOfTurn(u);
     if (await afterAction()) return;
-    if (skip) { await wait(350); continue; }
+    if (skip || u.dead) { await wait(350); continue; }
     if (isP(u)) await playerTurn(u); else await monsterTurn(u);
     if (await afterAction()) return;
   }
@@ -467,9 +476,15 @@ async function battleLoop() {
 async function afterAction() {
   refreshAll();
   await resolveDrinks();
+  if (!alivePlayers().length) { await partyWipe(); return true; }
   if (!liveMons().length) { await victory(); return true; }
   return false;
 }
+
+// คูลดาวน์: ตั้งเป็น cd+1 ตอนใช้ แล้วลดลง 1 ทุกต้นเทิร์นของตัวเอง → ต้องรอ cd เทิร์นเต็มๆ
+const cdLeft = (u, k) => (u.cd && u.cd[k]) || 0;
+function setCd(u, k, cd) { if (cd) (u.cd || (u.cd = {}))[k] = cd + 1; }
+function tickCd(u) { if (u.cd) for (const k in u.cd) if (u.cd[k] > 0) u.cd[k]--; }
 
 function tick(u) {
   u.effects.forEach(e => e.turns--);
@@ -477,6 +492,7 @@ function tick(u) {
 }
 
 async function startOfTurn(u) {
+  tickCd(u);
   u.effects = u.effects.filter(e => e.type !== 'defend' && e.type !== 'hide');
   if (fxOf(u, 'poison')) {
     const d = Math.max(3, Math.round(st(u).maxHp * 0.06));
@@ -524,7 +540,7 @@ function chooseAction(key) {
   if (key === 'defend') return commitAction(p, key, null);
   if (key === 'drink') { if (p.sp < minSkillCost(p)) commitAction(p, key, null); return; }
   const sk = key === 'attack' ? ATTACK : SKILLS[key];
-  if (!sk || (sk.lv && sk.lv > p.lv) || sk.sp > p.sp) return;
+  if (!sk || (sk.lv && sk.lv > p.lv) || sk.sp > p.sp || cdLeft(p, key) > 0) return;
   if (sk.target === 'enemy') {
     const ms = liveMons();
     if (ms.length === 1) return commitAction(p, key, ms[0].id);
@@ -549,10 +565,10 @@ function execAction(p, key, targetId) {
   if (key === 'defend') return runAction(() => doDefend(p));
   if (key === 'drink') return voluntaryDrink(p);
   const sk = key === 'attack' ? ATTACK : (JOBS[p.job].skills.includes(key) ? SKILLS[key] : null);
-  if (!sk || (sk.lv && sk.lv > p.lv) || sk.sp > p.sp) return;
+  if (!sk || (sk.lv && sk.lv > p.lv) || sk.sp > p.sp || cdLeft(p, key) > 0) return;
   let t = null;
   if (sk.target === 'enemy') { t = liveMons().find(m => m.id === targetId); if (!t) return; }
-  if (sk.target === 'ally') { t = S.players.find(x => x.id === targetId); if (!t) return; }
+  if (sk.target === 'ally') { t = S.players.find(x => x.id === targetId && !x.dead); if (!t) return; }
   runAction(() => useSkill(p, key, t));
 }
 
@@ -570,7 +586,7 @@ function onTargetClick(id) {
   const u = unitById(id);
   if (!u) return;
   if (sk.target === 'enemy' && (isP(u) || u.dead)) return;
-  if (sk.target === 'ally' && !isP(u)) return;
+  if (sk.target === 'ally' && (!isP(u) || u.dead)) return;
   commitAction(B.actor, key, u.id);
 }
 
@@ -609,6 +625,7 @@ async function doDefend(p) {
 async function useSkill(u, key, target) {
   const sk = key === 'attack' ? ATTACK : SKILLS[key];
   if (sk.sp) u.sp = Math.max(0, u.sp - sk.sp);
+  setCd(u, key, sk.cd);
   refreshAll();
   if (key !== 'attack') await callout(u, `${sk.icon} ${sk.name}!!`);
   if (sk.kind === 'phys' || sk.kind === 'magic') {
@@ -616,7 +633,7 @@ async function useSkill(u, key, target) {
     log(`${nm(u)} ${key === 'attack' ? '⚔️ โจมตี' : `ใช้ ${sk.icon} ${sk.name} ใส่`} ${sk.target === 'allEnemies' ? 'มอนทุกตัว' : nm(target)}`);
     await attack(u, targets, sk);
   } else if (sk.kind === 'heal') {
-    const targets = sk.target === 'party' ? S.players : [target];
+    const targets = sk.target === 'party' ? alivePlayers() : [target];
     castAnim(u);
     log(`${nm(u)} ใช้ ${sk.icon} ${sk.name}${sk.target === 'ally' ? ' ให้ ' + nm(target) : ''}`);
     targets.forEach(t => {
@@ -625,7 +642,7 @@ async function useSkill(u, key, target) {
       fxAt(t, 'heal'); popNum(t, '+' + amt, 'heal');
     });
   } else if (sk.kind === 'buff') {
-    const targets = sk.target === 'party' ? S.players : [u];
+    const targets = sk.target === 'party' ? alivePlayers() : [u];
     castAnim(u);
     log(`${nm(u)} ใช้ ${sk.icon} ${sk.name}`);
     targets.forEach(t => {
@@ -639,21 +656,23 @@ async function useSkill(u, key, target) {
 
 // ---------- ตามอนสเตอร์ ----------
 function chooseTarget() {
-  const vis = S.players.filter(p => !fxOf(p, 'hide'));
+  const vis = alivePlayers().filter(p => !fxOf(p, 'hide'));
   const taunt = vis.filter(p => fxOf(p, 'taunt'));
   if (taunt.length) return pick(taunt);
   if (!vis.length) return null;
   // บางทีมอนก็รุมคนที่เลือดน้อยสุด
-  if (Math.random() < 0.35) return vis.reduce((a, b) => (a.hp / derive(a).maxHp <= b.hp / derive(b).maxHp ? a : b));
+  if (Math.random() < 0.4) return vis.reduce((a, b) => (a.hp / derive(a).maxHp <= b.hp / derive(b).maxHp ? a : b));
   return pick(vis);
 }
 
 async function monsterTurn(m) {
   await wait(500);
   let key = 'basic';
-  if (m.skills.length && Math.random() < (m.boss ? 0.5 : m.elite ? 0.4 : 0.28)) key = pick(m.skills);
+  const ready = m.skills.filter(k => cdLeft(m, k) <= 0);
+  if (ready.length && Math.random() < (m.boss ? 0.7 : m.elite ? 0.55 : 0.4)) key = pick(ready);
   const sk = MON_SKILLS[key];
-  const targets = sk.aoe ? S.players.filter(p => !fxOf(p, 'hide')) : [chooseTarget()].filter(Boolean);
+  setCd(m, key, sk.cd);
+  const targets = sk.aoe ? alivePlayers().filter(p => !fxOf(p, 'hide')) : [chooseTarget()].filter(Boolean);
   if (!targets.length) { popNum(m, '???', 'miss'); log(`${nm(m)} หาเป้าหมายไม่เจอ!`); await wait(400); return; }
   if (key !== 'basic') await callout(m, `${sk.name}!!`);
   log(`${nm(m)} ${key === 'basic' ? 'โจมตี' : `ใช้ ${sk.name} ใส่`} ${sk.aoe ? 'ทั้งปาร์ตี้' : nm(targets[0])}`);
@@ -683,7 +702,7 @@ async function attack(att, targets, sk) {
   const hits = sk.hits || 1;
   for (let h = 0; h < hits; h++) {
     for (const t of targets) {
-      if (!isP(t) && t.dead) continue;
+      if (t.dead) continue;
       const r = calcHit(att, t, sk);
       if (r.miss) { popNum(t, 'Miss', 'miss'); continue; }
       t.hp = Math.max(0, t.hp - r.dmg);
@@ -718,31 +737,29 @@ async function killMons(list, killer) {
 
 // ---------- กฎดื่ม ----------
 async function resolveDrinks() {
-  const dead = S.players.filter(p => p.hp <= 0);
+  const dead = S.players.filter(p => !p.dead && p.hp <= 0);
   if (dead.length) {
-    dead.forEach(p => { p.deaths++; });
+    dead.forEach(p => { p.deaths++; p.dead = true; p.hp = 0; p.effects = []; });
     koAnim(dead, true);
     refreshAll();
     await wait(400);
     await showModal({
       icon: '💀🍺', cls: 'drink', allow: owners(dead),
       title: dead.length > 1 ? `${dead.length} คนตาย!` : `${esc(dead[0].name)} ตาย!`,
-      html: `${chipList(dead)}<p>ยก <b>1 แก้ว</b> ให้หมด แล้วฟื้นคืนชีพ HP/SP เต็ม</p>`,
+      html: `${chipList(dead)}<p>ยก <b>1 แก้ว</b> ให้หมด<br>🪦 นอนตายจนกว่าปาร์ตี้จะลงชั้นถัดไป</p>`,
       buttons: [{ label: '🍺 ยกหมดแล้ว!', cls: 'gold' }],
     });
     dead.forEach(p => {
-      const d = derive(p);
-      p.glasses += 1; p.hp = d.maxHp; p.sp = d.maxSp; p.effects = []; p.ct = 0;
-      fxAt(p, 'revive'); popNum(p, 'Resurrection!', 'heal');
-      log(`😇 ${nm(p)} ยก 1 แก้ว ฟื้นคืนชีพ! (รวม ${fmtGlass(p.glasses)} แก้ว)`);
+      p.glasses += 1;
+      popNum(p, 'R.I.P.', 'miss');
+      log(`🪦 ${nm(p)} ตาย ยก 1 แก้ว (รวม ${fmtGlass(p.glasses)} แก้ว) · ฟื้นตอนลงชั้นถัดไป`);
     });
-    koAnim(dead, false);
     refreshAll();
-    await wait(600);
+    await wait(500);
   }
   // มานาหมด = SP ไม่พอใช้สกิลที่ถูกที่สุด (บังคับดื่มครั้งเดียว จนกว่า SP จะกลับมาพอใช้)
   S.players.forEach(p => { if (p.sp >= minSkillCost(p)) p.dry = false; });
-  const dry = S.players.filter(p => !p.dry && p.sp < minSkillCost(p));
+  const dry = alivePlayers().filter(p => !p.dry && p.sp < minSkillCost(p));
   if (dry.length) {
     await showModal({
       icon: '💧🍺', cls: 'drink', allow: owners(dry),
@@ -765,6 +782,25 @@ async function resolveDrinks() {
 
 const owners = ps => [...new Set(ps.map(p => p.owner).filter(Boolean))];
 
+// ตายหมดทีม: ยกค่าปรับคนละ ½ แก้ว แล้วถอยกลับแผนที่ (ห้องนี้ต้องสู้ใหม่)
+async function partyWipe() {
+  B.actor = null;
+  refreshAll();
+  await wait(500);
+  await showModal({
+    icon: '☠️🍻', cls: 'drink', title: 'ปาร์ตี้ล้มทั้งทีม!',
+    html: `${chipList(S.players)}<p>ทุกคนยกเพิ่มอีก <b>½ แก้ว</b> เป็นค่าปรับ<br>แล้วถอยกลับไปตั้งหลัก (ฟื้น HP/SP เต็ม · ห้องนี้ต้องสู้ใหม่)</p>`,
+    buttons: [{ label: '🍺 ยกแล้ว สู้ต่อ!', cls: 'gold' }],
+  });
+  S.players.forEach(p => {
+    const d = derive(p);
+    p.glasses += 0.5; p.dead = false; p.effects = [];
+    p.hp = d.maxHp; p.sp = d.maxSp;
+  });
+  B = null;
+  goMap();
+}
+
 function chipList(ps) {
   return `<div class="chips">${ps.map(p => `<span class="pchip" style="--c:${p.color}">${chibi(p, { crop: 'head' })}${esc(p.name)}</span>`).join('')}</div>`;
 }
@@ -776,7 +812,7 @@ async function victory() {
   B.actor = null;
   await wait(300);
   const ups = [];
-  S.players.forEach(p => { if (gainExp(p, exp)) ups.push(p); });
+  S.players.forEach(p => { if (gainExp(p, p.dead ? Math.round(exp / 2) : exp)) ups.push(p); });
   S.players.forEach(p => { p.effects = []; });
   healParty(0.2);
   ups.forEach(p => { fxAt(p, 'lvup'); popNum(p, 'LEVEL UP!', 'lvup'); });
@@ -796,7 +832,7 @@ async function victory() {
     icon: '🏆', title: 'ชนะ!',
     html: `<div class="big-exp">+${exp} EXP ทุกคน</div>${upsText(ups)}${extra}
       ${ranking.length ? `<div class="rank"><small>ดาเมจสูงสุด</small>${ranking.map((p, i) => `<div>${['🥇', '🥈', '🥉'][i]} ${nm(p)} <b>${B.dmg[p.id]}</b></div>`).join('')}</div>` : ''}
-      <p class="muted">ทุกคนฟื้น HP/SP 20%</p>`,
+      <p class="muted">${S.players.some(p => p.dead) ? '🪦 คนที่ตายได้ EXP ครึ่งเดียว · ' : ''}คนที่รอดฟื้น HP/SP 20%</p>`,
     buttons: [{ label: exit ? '⬇️ ลงบันไดชั้นถัดไป' : '🗺️ กลับไปเลือกห้อง', cls: 'gold' }],
   });
   room.cleared = true;
@@ -857,6 +893,11 @@ function refreshAll() {
     n.classList.toggle('hidden-fx', !!fxOf(u, 'hide'));
     n.classList.toggle('taunt', !!fxOf(u, 'taunt'));
   });
+  S.players.forEach(p => {
+    const n = unitNode(p); if (!n) return;
+    n.classList.toggle('ko', !!p.dead);
+    if (p.dead) { n.querySelector('.u-hp i').style.width = '0%'; n.classList.remove('active'); }
+  });
   $('#cards').innerHTML = S.players.map(p => playerCard(p, 'compact')).join('');
   renderTimeline();
   renderAction();
@@ -881,8 +922,8 @@ function playerCard(p, mode) {
   const d = derive(p), J = JOBS[p.job];
   const active = B && B.actor === p;
   const mine = isOnline() && isMine(p), off = isOnline() && p.owner && p.owner !== NET.myId && !NET.online.has(p.owner);
-  return `<div class="pcard ${mode} ${active ? 'active' : ''} ${p.hp <= 0 ? 'ko' : ''} ${mine ? 'mine' : ''} ${off ? 'offline' : ''}" data-pid="${p.id}" style="--c:${p.color}">
-    ${mine ? '<span class="pc-me">คุณ</span>' : ''}${off ? '<span class="pc-off" title="ออฟไลน์">💤</span>' : ''}
+  return `<div class="pcard ${mode} ${active ? 'active' : ''} ${p.dead || p.hp <= 0 ? 'ko' : ''} ${mine ? 'mine' : ''} ${off ? 'offline' : ''}" data-pid="${p.id}" style="--c:${p.color}">
+    ${p.dead ? '<span class="pc-dead">🪦 ฟื้นตอนลงชั้นถัดไป</span>' : ''}${mine ? '<span class="pc-me">คุณ</span>' : ''}${off ? '<span class="pc-off" title="ออฟไลน์">💤</span>' : ''}
     <div class="pc-ava">${chibi(p, { crop: 'head' })}</div>
     <div class="pc-main">
       <div class="pc-top"><b class="pc-name">${esc(p.name)}</b><span class="pc-lv">Lv${p.lv}</span></div>
@@ -916,10 +957,11 @@ function renderAction() {
   const minCost = minSkillCost(u);
   const pend = B.pending ? (B.pending === 'attack' ? ATTACK : SKILLS[B.pending]) : null;
   const skBtn = (k, s) => {
-    const locked = s.lv && s.lv > u.lv;
-    const dis = lock || locked || s.sp > u.sp;
-    return `<button class="skill ${locked ? 'locked' : ''} ${B.pending === k ? 'sel' : ''}" data-act="${k}" ${dis ? 'disabled' : ''}>
-      <span class="s-ico">${s.icon}</span><span class="s-txt"><b>${s.name}</b><small><span class="cost">${locked ? `🔒 Lv${s.lv}` : s.sp ? `${s.sp} SP` : 'ฟรี'}</span><span class="desc"> · ${s.desc}</span></small></span></button>`;
+    const locked = s.lv && s.lv > u.lv, left = cdLeft(u, k);
+    const dis = lock || locked || s.sp > u.sp || left > 0;
+    const cost = locked ? `🔒 Lv${s.lv}` : left ? `⏳ รอ ${left} เทิร์น` : s.sp ? `${s.sp} SP` : 'ฟรี';
+    return `<button class="skill ${locked ? 'locked' : ''} ${left && !locked ? 'cooling' : ''} ${B.pending === k ? 'sel' : ''}" data-act="${k}" data-cd="${left}" ${dis ? 'disabled' : ''}>
+      <span class="s-ico">${s.icon}</span><span class="s-txt"><b>${s.name}</b><small><span class="cost">${cost}</span><span class="desc"> · ${s.desc}${s.cd ? ` · CD ${s.cd}` : ''}</span></small></span></button>`;
   };
   el.style.setProperty('--c', u.color);
   el.innerHTML = `
@@ -941,7 +983,7 @@ function renderAction() {
 function markTargets(kind) {
   clearTargets();
   if (kind === 'enemy') liveMons().forEach(m => unitNode(m)?.classList.add('targetable'));
-  else S.players.forEach(p => { unitNode(p)?.classList.add('targetable'); $(`.pcard[data-pid="${p.id}"]`)?.classList.add('targetable'); });
+  else alivePlayers().forEach(p => { unitNode(p)?.classList.add('targetable'); $(`.pcard[data-pid="${p.id}"]`)?.classList.add('targetable'); });
 }
 function clearTargets() { $$('.targetable').forEach(n => n.classList.remove('targetable')); }
 
@@ -1055,7 +1097,7 @@ function openSheet(pid) {
         .map(([k, v]) => `<div><small>${k}</small><b>${v}</b></div>`).join('')}</div>
       <div class="win-title">สกิล</div>
       <div class="skill-list">${J.skills.map(k => { const s = SKILLS[k], lk = p.lv < s.lv;
-        return `<div class="sk ${lk ? 'locked' : ''}"><span class="s-ico">${s.icon}</span><div><b>${s.name}</b> <small>${lk ? `🔒 ปลดล็อก Lv${s.lv}` : `${s.sp} SP`}</small><div class="sk-desc">${s.desc}</div></div></div>`; }).join('')}</div>
+        return `<div class="sk ${lk ? 'locked' : ''}"><span class="s-ico">${s.icon}</span><div><b>${s.name}</b> <small>${lk ? `🔒 ปลดล็อก Lv${s.lv}` : `${s.sp} SP · คูลดาวน์ ${s.cd} เทิร์น`}</small><div class="sk-desc">${s.desc}</div></div></div>`; }).join('')}</div>
     </div>
   </div>`);
 }
