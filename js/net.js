@@ -91,7 +91,7 @@ function netSend(msg) {
 function snapshot() {
   return {
     S: { floor: S.floor, deepest: S.deepest, players: S.players, rooms: S.rooms, need: S.need, screen: S.screen },
-    B: B ? { bid: B.bid, roomId: B.room.id, mons: B.mons, dmg: B.dmg, actorId: B.actor ? B.actor.id : null, waiting: B.waiting || null, busy: !!B.busy } : null,
+    B: B ? { bid: B.bid, roomId: B.room.id, mons: B.mons, dmg: B.dmg, actorId: B.actor ? B.actor.id : null, waiting: B.waiting || null, busy: !!B.busy, focusP: B.focusP || null, focusM: B.focusM || null } : null,
     speed: SPEED,
   };
 }

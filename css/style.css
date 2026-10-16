@@ -698,3 +698,111 @@ button, .unit, .pcard, .door { -webkit-tap-highlight-color: transparent; }
 /* ---------- ฝืนร่าย (SP ไม่พอ) ---------- */
 .skill.overcast { box-shadow: inset 0 0 0 1px #ff9a3d88; }
 .skill.overcast .cost { color: #ffb066; font-weight: 500; }
+
+/* =====================================================================
+   ฉากต่อสู้มุมกล้องใหม่: เรามองจากด้านหลังซ้ายล่าง มอนอยู่บนแท่นขวาบน
+   ===================================================================== */
+.scene {
+  position: relative; width: min(100%, calc(64vh * 16 / 9)); aspect-ratio: 16 / 9; margin: 0 auto;
+  border-radius: 16px; overflow: hidden; container-type: inline-size; isolation: isolate;
+  border: 3px solid #0008; box-shadow: 0 10px 30px #000a; background: var(--g2);
+}
+.sc-sky { position: absolute; inset: 0 0 46% 0; background: linear-gradient(var(--sky1), var(--sky2)); }
+.sc-sky::after { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse 60% 70% at 75% 30%, #ffffff40, transparent 70%); }
+.sc-hills {
+  position: absolute; left: -5%; right: -5%; top: 36%; height: 20%; opacity: .9;
+  background:
+    radial-gradient(ellipse 22% 85% at 12% 100%, var(--hill) 97%, transparent 100%),
+    radial-gradient(ellipse 30% 65% at 42% 100%, var(--hill) 97%, transparent 100%),
+    radial-gradient(ellipse 26% 95% at 70% 100%, var(--hill) 97%, transparent 100%),
+    radial-gradient(ellipse 22% 70% at 95% 100%, var(--hill) 97%, transparent 100%);
+}
+.sc-ground { position: absolute; inset: 53% 0 0 0; background: linear-gradient(var(--g1), var(--g2)); }
+.sc-ground::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3%; background: #ffffff55; filter: blur(2px); }
+.sc-ground::after {
+  content: ""; position: absolute; inset: 0; opacity: .18;
+  background: repeating-linear-gradient(100deg, transparent 0 3cqw, #0003 3cqw 3.3cqw), repeating-linear-gradient(80deg, transparent 0 5cqw, #fff3 5cqw 5.2cqw);
+}
+.sc-plat {
+  position: absolute; border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 32%, color-mix(in srgb, var(--plat) 70%, #fff) 0%, var(--plat) 40%, var(--plat2) 78%);
+  box-shadow: inset 0 -0.8cqw 0 #0002, inset 0 0.5cqw 0 #ffffff40, 0 1cqw 2cqw #0005;
+}
+.sc-plat::after { content: ""; position: absolute; inset: 8% 6%; border-radius: 50%; border: .25cqw dashed #ffffff30; }
+.sc-plat.e { left: 52%; top: 37%; width: 45%; height: 15%; }
+.sc-plat.p { left: -10%; top: 73%; width: 72%; height: 34%; }
+.sc-motes i { position: absolute; width: .55cqw; height: .55cqw; min-width: 3px; min-height: 3px; border-radius: 50%; background: var(--mote); box-shadow: 0 0 1.2cqw var(--mote); opacity: .6; animation: mote 7s ease-in-out infinite; }
+@keyframes mote { 0%, 100% { transform: translate(0, 0); opacity: .15; } 50% { transform: translate(2.5cqw, -3cqw); opacity: .9; } }
+
+.stage { position: absolute; inset: 0; z-index: 2; }
+.scene .unit { position: absolute; display: block; max-width: none !important; width: 10%; margin: 0; top: auto; transition: left .45s ease, bottom .45s ease, width .45s ease, margin-left .45s ease; }
+.scene .unit .u-body, .scene .unit .u-sprite { width: 100%; }
+.scene .pu .u-sprite svg { transform: none; }
+.scene .u-ring { bottom: 0; height: 9%; width: 80%; }
+.scene .u-label { position: absolute; top: 98%; left: 50%; transform: translateX(-50%); width: max-content; max-width: 170%; margin: 0; gap: 1px; }
+.scene .u-name { font-size: clamp(8px, 1.1cqw, 12px); font-weight: 500; text-shadow: 0 1px 2px #000, 0 0 3px #000; }
+.scene .u-hp { width: 6.5cqw; min-width: 34px; height: .6cqw; min-height: 4px; }
+.scene .unit.hero .u-label { display: none; }
+.scene .unit.hero .u-sprite.bob { animation-name: heroBreath; animation-duration: 2.4s; }
+@keyframes heroBreath { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.015, .985); } }
+.scene .unit.active .u-ring { box-shadow: 0 0 2cqw var(--c); }
+.scene .unit.pu.ko::after { bottom: 6%; font-size: clamp(14px, 2.6cqw, 30px); }
+.scene .unit.pu.ko .u-body { transform: rotate(70deg) translate(18%, 10%); }
+.scene .num { font-size: clamp(14px, 2.5cqw, 28px); }
+.scene .num.crit { font-size: clamp(17px, 3cqw, 34px); }
+.scene .num.miss, .scene .num.sp { font-size: clamp(11px, 1.7cqw, 18px); }
+.scene .fx b { font-size: clamp(20px, 4cqw, 46px); }
+.scene .unit.hero .num { top: 8%; font-size: clamp(18px, 3.4cqw, 38px); }
+.scene .unit.targetable::before { top: -4%; left: 50%; transform: translateX(-50%); font-size: clamp(12px, 2cqw, 22px); }
+.scene.shake { animation: shake .5s; }
+
+/* เราพุ่งเข้าหาศัตรูขวาบน / มอนพุ่งลงมาซ้ายล่าง */
+@keyframes lungeL { 0% { transform: none; } 35% { transform: translate(28%, -16%) scale(.9); } 100% { transform: none; } }
+@keyframes lungeR { 0% { transform: none; } 35% { transform: translate(-32%, 24%) scale(1.15); } 100% { transform: none; } }
+
+/* กล่องข้อมูล + กล่องข้อความ */
+.ibox {
+  position: absolute; z-index: 100; color: #fff; padding: .9cqw 1.6cqw 1cqw;
+  background: linear-gradient(#404858f2, #232833f2); border: .3cqw solid #e6e9f2; border-radius: 1.6cqw;
+  box-shadow: 0 .5cqw 1cqw #0006; font-size: clamp(10px, 1.55cqw, 17px); line-height: 1.3;
+}
+.ibox.enemy { left: 2.5%; top: 5%; width: 36%; border-radius: .6cqw 2.4cqw 2.4cqw .6cqw; }
+.ibox.player { right: 2.5%; bottom: 19.5%; width: 35%; border-radius: 2.4cqw .6cqw .6cqw 2.4cqw; border-left: .9cqw solid var(--c); }
+.ib-top { display: flex; align-items: baseline; gap: .8cqw; }
+.ib-top b { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+.ib-lv { color: #ffe27a; font-weight: 600; white-space: nowrap; }
+.ib-hp { display: flex; align-items: center; gap: .7cqw; margin-top: .45cqw; }
+.ib-hp > span { font-size: .72em; font-weight: 700; color: #ffcc3d; background: #0009; padding: 0 .6cqw; border-radius: .5cqw; }
+.ib-hp > span.sp { color: #8fd0ff; }
+.ib-bar { flex: 1; height: 1.05cqw; min-height: 6px; background: #000b; border-radius: 99px; overflow: hidden; border: 1px solid #ffffff55; }
+.ib-bar i { display: block; height: 100%; border-radius: 99px; transition: width .45s ease, background .3s; }
+.ib-bar.hi i { background: linear-gradient(#8dffa8, #29b34c); }
+.ib-bar.mid i { background: linear-gradient(#ffe88a, #e0a61a); }
+.ib-bar.low i { background: linear-gradient(#ff9a9a, #e2304a); }
+.ib-bar.sp i { background: linear-gradient(var(--sp1), var(--sp2)); }
+.ib-num { text-align: right; font-size: .8em; font-weight: 600; letter-spacing: .04em; margin-top: .1cqw; }
+.ib-sub { min-height: 1em; font-size: .8em; display: flex; gap: .6cqw; align-items: center; }
+.ib-sub small { opacity: .75; margin-left: auto; }
+.msgbox {
+  position: absolute; z-index: 100; left: 1.5%; right: 1.5%; bottom: 2.5%; height: 14.5%;
+  display: flex; align-items: center; padding: 0 2.6cqw; overflow: hidden;
+  background: linear-gradient(#323947f5, #1c2028f5); border: .35cqw solid #d6dae6; border-radius: 1.6cqw;
+  box-shadow: inset 0 0 0 .35cqw #0007, 0 .6cqw 1.2cqw #0007; color: #fff;
+  font-size: clamp(11px, 1.9cqw, 21px); line-height: 1.35;
+}
+.msgbox b { font-weight: 600; }
+
+@media (max-width: 760px) {
+  .scene { aspect-ratio: 4 / 3; width: 100%; border-radius: 12px; border-width: 2px; }
+  .sc-plat.e { top: 36%; height: 14%; }
+  .ibox { font-size: clamp(9px, 2.6cqw, 13px); padding: 1.2cqw 2cqw; }
+  .ibox.enemy { width: 42%; }
+  .ibox.player { width: 41%; bottom: 20%; }
+  .msgbox { height: 16%; font-size: clamp(10px, 3cqw, 15px); }
+  .scene .u-name { font-size: clamp(7px, 2cqw, 10px); }
+  .scene .u-hp { min-width: 26px; }
+}
+
+/* ชื่อมอนแสดงเฉพาะตอนเลือกเป้าหมาย (ปกติดูในกล่องมุมซ้ายบน) */
+.scene .mu .u-name { display: none; }
+.scene .mu.targetable .u-name, .scene .mu:hover .u-name { display: block; }

@@ -99,6 +99,60 @@ function chibi(p, opt = {}) {
   return `<svg viewBox="${vb}" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
 }
 
+// ---------- ตัวละครมองจากด้านหลัง (ใช้ในฉากต่อสู้) ----------
+function chibiBack(p) {
+  const J = JOBS[p.job], o = J.look, h = p.hair, sk = SKIN;
+  const hs = (p.hairStyle || 0) % 4;
+  const robe = p.job === 'mage' || p.job === 'acolyte';
+  const dark = 'rgba(0,0,0,.18)';
+  let s = `<ellipse cx="32" cy="76" rx="18" ry="4.5" fill="rgba(0,0,0,.35)"/>`;
+
+  // อาวุธที่อยู่หลังลำตัว (ด้ามจับ)
+  if (p.job === 'archer') s += `<path d="M49 38 Q61 57 49 76" fill="none" stroke="#8b5a2b" stroke-width="3.2" stroke-linecap="round"/><line x1="49" y1="38" x2="49" y2="76" stroke="#eee" stroke-width="1"/>`;
+  if (p.job === 'mage') s += `<line x1="15" y1="74" x2="13" y2="36" stroke="#7a4b2a" stroke-width="3.2" stroke-linecap="round"/><circle cx="13" cy="33" r="8" fill="#7ee3ff" opacity=".3"/><circle cx="13" cy="33" r="4.8" fill="#7ee3ff" ${SW}/>`;
+  if (p.job === 'acolyte') s += `<line x1="16" y1="72" x2="15" y2="40" stroke="#d9c27a" stroke-width="2.8" stroke-linecap="round"/><path d="M15 29 L17.5 34.5 L23 35 L19 39 L20 44.5 L15 42 L10 44.5 L11 39 L7 35 L12.5 34.5 Z" fill="#ffe56b" ${SW}/>`;
+  if (p.job === 'merchant') s += `<line x1="17" y1="72" x2="15" y2="38" stroke="#7a4b2a" stroke-width="3.2" stroke-linecap="round"/><path d="M15 37 Q2 34 3 47 Q9 44 15 47 Z" fill="#cfd6df" ${SW}/>`;
+
+  // ขา
+  if (!robe) s += `<rect x="25" y="62" width="6" height="11" rx="2" fill="${o.pants}" ${SW}/><rect x="33" y="62" width="6" height="11" rx="2" fill="${o.pants}" ${SW}/>`;
+  s += `<ellipse cx="27.5" cy="74" rx="4.8" ry="2.6" fill="#4a2f22" ${SW}/><ellipse cx="36.5" cy="74" rx="4.8" ry="2.6" fill="#4a2f22" ${SW}/>`;
+
+  // ลำตัวด้านหลัง
+  if (robe) s += `<path d="M18 73 Q18 48 32 45 Q46 48 46 73 Z" fill="${o.main}" ${SW}/><path d="M32 47 L32 73" stroke="${dark}" stroke-width="1.4"/>`;
+  else s += `<path d="M19 65 Q18 48 32 45 Q46 48 45 65 Z" fill="${o.main}" ${SW}/><rect x="19.5" y="58" width="25" height="3.5" fill="${o.trim}" ${SW}/>`;
+  s += `<ellipse cx="18" cy="55" rx="4" ry="6.5" fill="${o.main}" ${SW}/><ellipse cx="46" cy="55" rx="4" ry="6.5" fill="${o.main}" ${SW}/>`;
+
+  // ของที่สะพายหลัง
+  if (p.job === 'swordsman') s += `<ellipse cx="20" cy="49" rx="6" ry="4.2" fill="#c9d3e0" ${SW}/><ellipse cx="44" cy="49" rx="6" ry="4.2" fill="#c9d3e0" ${SW}/><path d="M21 47 Q32 51 43 47 L48 74 Q32 78 16 74 Z" fill="#c43c3c" ${SW}/><path d="M26 52 L24 73 M32 53 L32 75 M38 52 L40 73" stroke="${dark}" stroke-width="1.2"/>`;
+  if (p.job === 'merchant') s += `<rect x="20" y="47" width="24" height="20" rx="5" fill="#8a5a2f" ${SW}/><rect x="20" y="53" width="24" height="3" fill="#6b4226"/><rect x="29" y="56" width="6" height="5" rx="1" fill="#e8c35a" ${SW}/>`;
+  if (p.job === 'archer') s += `<g transform="rotate(-25 34 56)"><rect x="30" y="44" width="8" height="20" rx="3" fill="#8b5a2b" ${SW}/><path d="M31 44 L30 37 M34 44 L34 36 M37 44 L38 37" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/></g>`;
+  if (p.job === 'thief') s += `<path d="M22 47 Q32 52 42 47 L40 60 Q32 63 24 60 Z" fill="${o.trim}" ${SW}/>`;
+
+  // หู + หัวด้านหลัง (ผมทั้งหัว)
+  s += `<ellipse cx="15.3" cy="31" rx="2.6" ry="3.6" fill="${sk}" ${SW}/><ellipse cx="48.7" cy="31" rx="2.6" ry="3.6" fill="${sk}" ${SW}/>`;
+  if (hs === 2) s += `<path d="M14 28 Q14 9 32 9 Q50 9 50 28 L51 56 Q32 61 13 56 Z" fill="${h}" ${SW}/>`;
+  s += `<circle cx="32" cy="28" r="17" fill="${h}" ${SW}/>`;
+  s += `<path d="M22 16 Q26 30 24 42 M32 12 Q34 28 32 44 M42 16 Q38 30 40 42" fill="none" stroke="${dark}" stroke-width="1.4" stroke-linecap="round"/>`;
+  if (hs === 0) s += `<path d="M15 24 L11 15 L20 18 L22 9 L28 15 L32 6 L36 15 L42 9 L44 18 L53 15 L49 24 Z" fill="${h}" ${SW}/>`;
+  if (hs === 1) s += `<path d="M15 34 Q18 44 24 41 Q28 46 32 42 Q36 46 40 41 Q46 44 49 34 Z" fill="${h}" ${SW}/>`;
+  if (hs === 3) s += `<circle cx="32" cy="20" r="3" fill="${o.trim}" ${SW}/><path d="M29 22 Q24 38 31 56 Q38 40 35 22 Z" fill="${h}" ${SW}/>`;
+
+  // หมวก / ผ้าคาด (ด้านหลัง)
+  if (p.job === 'mage') s += `<path d="M19 14 L26 -9 L45 14 Z" fill="${o.main}" ${SW}/><path d="M21 10 L44 10 L45 14 L19 14 Z" fill="${o.trim}"/><ellipse cx="32" cy="14" rx="22" ry="5" fill="${o.main}" ${SW}/>`;
+  if (p.job === 'archer') s += `<path d="M15 20 Q32 26 49 20" stroke="${o.trim}" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M18 17 Q4 3 7 -5 Q12 7 20 15 Z" fill="#fff" ${SW}/>`;
+  if (p.job === 'acolyte') s += `<path d="M16 19 Q32 1 48 19 Q32 24 16 19 Z" fill="${o.trim}" ${SW}/>`;
+  if (p.job === 'thief') s += `<path d="M13 22 Q32 5 51 22 L51 26 Q32 30 13 26 Z" fill="${o.trim}" ${SW}/><path d="M32 25 L25 40 L31 38 Z M32 25 L40 39 L34 38 Z" fill="${o.trim}" ${SW}/><circle cx="32" cy="25" r="2.6" fill="${o.trim}" ${SW}/>`;
+  if (p.job === 'merchant') s += `<path d="M15 21 Q32 1 49 21 Q32 26 15 21 Z" fill="${o.trim}" ${SW}/>`;
+  if (p.job === 'swordsman') s += `<path d="M15 21 Q32 28 49 21" stroke="#c9d3e0" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M32 27 L28 37 M32 27 L36 37" stroke="#c9d3e0" stroke-width="2.4" stroke-linecap="round"/>`;
+
+  // อาวุธที่ยกขึ้นเหนือไหล่ + มือ
+  if (p.job === 'swordsman') s += `<g transform="rotate(18 46 61)"><rect x="44" y="30" width="4.6" height="28" rx="1" fill="#e8eef7" ${SW}/><rect x="40" y="56.5" width="12.6" height="3.6" rx="1" fill="#d4a62a" ${SW}/><rect x="44.6" y="60" width="3.4" height="8" fill="#6b4226" ${SW}/></g>`;
+  if (p.job === 'thief') s += `<g transform="rotate(35 46 61)"><path d="M44.4 58 L46.5 43 L48.6 58 Z" fill="#e8eef7" ${SW}/><rect x="42" y="57.5" width="9" height="2.6" fill="#555"/></g>`;
+  s += `<circle cx="18" cy="61" r="3.2" fill="${sk}" ${SW}/><circle cx="46" cy="61" r="3.2" fill="${sk}" ${SW}/>`;
+
+  return `<svg viewBox="-2 -12 68 92" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
+}
+
 // ---------- มอนสเตอร์ ----------
 function crown(cx, y, w = 26) {
   const l = cx - w / 2, r = cx + w / 2;

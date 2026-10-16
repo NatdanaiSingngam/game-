@@ -140,11 +140,16 @@ const MON_SKILLS = {
 
 // ---------- ดันเจี้ยน ----------
 const THEMES = [
-  { name: 'ถ้ำเจลลี่', bg1: '#4a3424', bg2: '#1c140e', tile: '#5a4230', glow: '#ffb86b' },
-  { name: 'ป่าต้องสาป', bg1: '#24503a', bg2: '#0b1a12', tile: '#2f5e44', glow: '#9bff8a' },
-  { name: 'สุสานใต้ดิน', bg1: '#3a2f58', bg2: '#110d1c', tile: '#463a6a', glow: '#b9a0ff' },
-  { name: 'ปล่องลาวา', bg1: '#5e2418', bg2: '#1e0907', tile: '#6e3220', glow: '#ff7b3d' },
-  { name: 'ปราสาทมืด', bg1: '#222a52', bg2: '#080b1a', tile: '#2e3870', glow: '#7ee3ff' },
+  { name: 'ถ้ำเจลลี่', bg1: '#4a3424', bg2: '#1c140e', tile: '#5a4230', glow: '#ffb86b',
+    sky1: '#3a2a20', sky2: '#c9925a', hill: '#5a3f2a', g1: '#d7b07a', g2: '#a37b4c', plat: '#e6c48c', plat2: '#a5804f', mote: '#ffd9a0' },
+  { name: 'ป่าต้องสาป', bg1: '#24503a', bg2: '#0b1a12', tile: '#2f5e44', glow: '#9bff8a',
+    sky1: '#9fd6b0', sky2: '#eef9e8', hill: '#6fae6f', g1: '#9bd88e', g2: '#5fa860', plat: '#8fd47e', plat2: '#4f9a4a', mote: '#f6ff9a' },
+  { name: 'สุสานใต้ดิน', bg1: '#3a2f58', bg2: '#110d1c', tile: '#463a6a', glow: '#b9a0ff',
+    sky1: '#2a2150', sky2: '#9a86d0', hill: '#3a3060', g1: '#8a86a6', g2: '#57536f', plat: '#a6a2c2', plat2: '#615c80', mote: '#c9b6ff' },
+  { name: 'ปล่องลาวา', bg1: '#5e2418', bg2: '#1e0907', tile: '#6e3220', glow: '#ff7b3d',
+    sky1: '#2a0805', sky2: '#e0602c', hill: '#3e120a', g1: '#7a3a26', g2: '#3e1a10', plat: '#8e4e34', plat2: '#4a2216', mote: '#ffb347' },
+  { name: 'ปราสาทมืด', bg1: '#222a52', bg2: '#080b1a', tile: '#2e3870', glow: '#7ee3ff',
+    sky1: '#0b1230', sky2: '#4a5fae', hill: '#141c44', g1: '#5c679a', g2: '#323b66', plat: '#7f8bc0', plat2: '#454f80', mote: '#9fe8ff' },
 ];
 
 const ROOM_TYPES = {

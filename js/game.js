@@ -126,7 +126,7 @@ function renderSetup() {
         <li>เลือกห้องในแต่ละชั้นได้เอง (สุ่ม 3–6 ห้อง) ต้องเคลียร์อย่างน้อย 2 ห้องก่อนบุกห้องบันไดลงชั้นถัดไป</li>
         <li>ทุก 5 ชั้นจะเจอบอส <b>MVP</b> 👑 · ยิ่งลงลึก มอนยิ่งเลเวลสูงและโหดขึ้น</li>
         <li>เทิร์นนับตาม <b>SPD</b> (AGI สูง = ได้เล่นถี่) ดูลำดับได้ที่แถบด้านบนสนาม</li>
-        <li>สกิลมี <b>คูลดาวน์</b> ใช้แล้วต้องรอตามจำนวนเทิร์น · จำนวนมอนเพิ่มตามขนาดปาร์ตี้ (8 คน ≈ 6 ตัว)</li>
+        <li>สกิลมี <b>คูลดาวน์</b> ใช้แล้วต้องรอตามจำนวนเทิร์น · จำนวนมอนเพิ่มตามขนาดปาร์ตี้ (8 คน ≈ 5 ตัว)</li>
         <li>เลเวลอัพได้ <b>+3 แต้มสเตตัส</b> กดที่การ์ดผู้เล่นเพื่ออัพ STR / AGI / VIT / INT / DEX / LUK</li>
         <li>💀 <b>HP หมด</b> → ยก 1 แก้ว แล้ว<b>นอนตายจนกว่าจะลงชั้นถัดไป</b> (ตายหมดทีม = ยกเพิ่มคนละ ½ แก้ว) · 💧 <b>มานาหมด (SP เหลือ 0)</b> → ยก ¼ แก้ว ได้ +10 SP · SP ไม่พอก็<b>ฝืนใช้สกิลได้</b> แต่ SP จะหมดเกลี้ยงแล้วต้องยก</li>
         <li>ดื่มอย่างรับผิดชอบ รู้ลิมิตตัวเอง ห้ามขับขี่ 🚫🚗</li>
@@ -350,13 +350,13 @@ function finalize(m) {
   return m;
 }
 
-// ปาร์ตี้ใหญ่ → มอนเยอะขึ้น (8 คน ≈ 6 ตัว) และได้เทิร์นถี่ขึ้น
-const baseMonCount = () => Math.max(2, Math.round(S.players.length * 0.75));
+// ปาร์ตี้ใหญ่ → มอนเยอะขึ้น (8 คน ≈ 5 ตัว) และได้เทิร์นถี่ขึ้น
+const baseMonCount = () => Math.max(2, Math.round(S.players.length * 0.65));
 const partyHp = () => 0.85 + S.players.length * 0.03;
 const partySpd = () => 0.85 + S.players.length * 0.05;
 // มอนเยอะขึ้น → EXP ต่อตัวลดลง ให้เลเวลขึ้นเร็วเท่าเดิม
 const expScale = () => Math.min(1, 4 / baseMonCount());
-const MON_ATK = 1.6;
+const MON_ATK = 1.45;
 
 function makeMon(key, lv, mod) {
   const t = MONSTERS[key];
@@ -464,6 +464,7 @@ async function battleLoop() {
     const u = nextActor();
     B.actor = u;
     B.pending = null;
+    if (isP(u)) B.focusP = u.id; else B.focusM = u.id;
     refreshAll();
     const skip = await startOfTurn(u);
     if (await afterAction()) return;
@@ -517,7 +518,7 @@ async function startOfTurn(u) {
 
 // ---------- ตาผู้เล่น ----------
 function playerTurn(p) {
-  return new Promise(res => { B.done = res; B.waiting = p.id; B.override = null; renderAction(); netSync(); });
+  return new Promise(res => { B.done = res; B.waiting = p.id; B.override = null; refreshAll(); });
 }
 
 function minSkillCost(p) {
@@ -538,7 +539,7 @@ function chooseAction(key) {
   if (!canControl(p)) return;
   if (key === 'cancel') { B.pending = null; clearTargets(); renderAction(); return; }
   if (key === 'defend') return commitAction(p, key, null);
-  if (key === 'drink') { if (p.sp < minSkillCost(p)) commitAction(p, key, null); return; }
+  if (key === 'drink') { if (p.sp < derive(p).maxSp) commitAction(p, key, null); return; }
   const sk = key === 'attack' ? ATTACK : SKILLS[key];
   if (!sk || (sk.lv && sk.lv > p.lv) || (sk.sp && p.sp <= 0) || cdLeft(p, key) > 0) return;
   if (sk.target === 'enemy') {
@@ -600,7 +601,7 @@ async function runAction(fn) {
 }
 
 async function voluntaryDrink(p) {
-  if (p.sp >= minSkillCost(p) || B.busy) return;
+  if (p.sp >= derive(p).maxSp || B.busy) return;
   B.busy = true; renderAction(); netSync();
   await showModal({ icon: '💧🍺', title: `${esc(p.name)} เติมมานา`, html: `ยก <b>¼ แก้ว</b> รับ <b>+10 SP</b>`, cls: 'drink', allow: owners([p]), buttons: [{ label: '🍺 ยกแล้ว! (+10 SP)', cls: 'gold' }] });
   p.glasses += 0.25;
@@ -631,6 +632,7 @@ async function useSkill(u, key, target) {
   if (key !== 'attack') await callout(u, `${sk.icon} ${sk.name}!!`);
   if (sk.kind === 'phys' || sk.kind === 'magic') {
     const targets = sk.target === 'allEnemies' ? liveMons() : [target];
+    if (sk.target === 'enemy') { B.focusM = target.id; refreshAll(); }
     log(`${nm(u)} ${key === 'attack' ? '⚔️ โจมตี' : `ใช้ ${sk.icon} ${sk.name} ใส่`} ${sk.target === 'allEnemies' ? 'มอนทุกตัว' : nm(target)}`);
     await attack(u, targets, sk);
   } else if (sk.kind === 'heal') {
@@ -670,11 +672,12 @@ async function monsterTurn(m) {
   await wait(500);
   let key = 'basic';
   const ready = m.skills.filter(k => cdLeft(m, k) <= 0);
-  if (ready.length && Math.random() < (m.boss ? 0.7 : m.elite ? 0.55 : 0.4)) key = pick(ready);
+  if (ready.length && Math.random() < (m.boss ? 0.6 : m.elite ? 0.45 : 0.33)) key = pick(ready);
   const sk = MON_SKILLS[key];
   setCd(m, key, sk.cd);
   const targets = sk.aoe ? alivePlayers().filter(p => !fxOf(p, 'hide')) : [chooseTarget()].filter(Boolean);
   if (!targets.length) { popNum(m, '???', 'miss'); log(`${nm(m)} หาเป้าหมายไม่เจอ!`); await wait(400); return; }
+  if (!sk.aoe && targets[0].id !== B.focusP) { B.focusP = targets[0].id; refreshAll(); await wait(450); }
   if (key !== 'basic') await callout(m, `${sk.name}!!`);
   log(`${nm(m)} ${key === 'basic' ? 'โจมตี' : `ใช้ ${sk.name} ใส่`} ${sk.aoe ? 'ทั้งปาร์ตี้' : nm(targets[0])}`);
   await attack(m, targets, sk);
@@ -852,10 +855,14 @@ function renderBattle() {
       <div class="top-btns">${netBadge()}${NET.mode !== 'client' ? `<button class="btn" id="btnSpeed">⏩ x${SPEED}</button>` : ''}<button class="btn" data-open="board">🍺</button><button class="btn" data-open="menu">☰</button></div>
     </div>
     <div class="timeline" id="timeline"></div>
-    <div class="field" id="field">
-      <div class="floor-plane"></div>
-      <div class="side mon-side" id="monSide">${liveMons().map(unitHTML).join('')}</div>
-      <div class="side party-side n${S.players.length}" id="partySide">${S.players.map(unitHTML).join('')}</div>
+    <div class="scene" id="field" style="--sky1:${th.sky1};--sky2:${th.sky2};--hill:${th.hill};--g1:${th.g1};--g2:${th.g2};--plat:${th.plat};--plat2:${th.plat2};--mote:${th.mote}">
+      <div class="sc-sky"></div><div class="sc-hills"></div><div class="sc-ground"></div>
+      <div class="sc-plat e"></div><div class="sc-plat p"></div>
+      <div class="sc-motes">${Array.from({ length: 12 }, (_, i) => `<i style="left:${(i * 37 + 7) % 100}%;top:${8 + (i * 29) % 70}%;animation-delay:${(-i * 0.7).toFixed(1)}s"></i>`).join('')}</div>
+      <div class="stage" id="stage">${liveMons().map(unitHTML).join('')}${S.players.map(unitHTML).join('')}</div>
+      <div class="ibox enemy" id="iboxE"></div>
+      <div class="ibox player" id="iboxP"></div>
+      <div class="msgbox" id="msgbox"></div>
     </div>
     <div class="action" id="action"></div>
     <div class="party-cards compact" id="cards"></div>
@@ -869,10 +876,91 @@ function unitHTML(u) {
   const anim = P ? 'bob' : (IDLE_ANIM[u.sprite] || 'bob');
   return `<div class="unit ${P ? 'pu' : 'mu'} ${u.boss ? 'boss' : ''} ${u.elite ? 'elite' : ''}" data-uid="${u.id}" style="--c:${P ? u.color : '#ff4b4b'}">
     <div class="u-ring"></div>
-    <div class="u-body"><div class="u-sprite ${anim}" style="--d:${(-Math.random() * 2).toFixed(2)}s">${P ? chibi(u) : monSprite(u)}</div></div>
+    <div class="u-body"><div class="u-sprite ${anim}" style="--d:${(-Math.random() * 2).toFixed(2)}s">${P ? chibiBack(u) : monSprite(u)}</div></div>
     <div class="u-label"><span class="u-name">${P ? esc(u.name) : `Lv${u.lv} ${esc(u.name)}`}</span><div class="u-hp"><i></i></div></div>
     <div class="u-eff"></div>
   </div>`;
+}
+
+// ---------- กล้องฉากต่อสู้: ตัวที่โฟกัสยืนใหญ่ข้างหน้า มอนอยู่บนแท่นไกลๆ ----------
+function heroOf() {
+  const ps = S.players;
+  return ps.find(p => p.id === B.focusP && !p.dead) || (B.actor && isP(B.actor) ? B.actor : null) || ps.find(p => !p.dead) || ps[0];
+}
+function focusMon() {
+  const ms = liveMons();
+  return ms.find(m => m.id === B.focusM) || (B.actor && !isP(B.actor) ? B.actor : null) || ms[0] || null;
+}
+function setPos(u, x, y, w, z) {
+  const n = unitNode(u); if (!n) return;
+  n.style.left = x + '%';
+  n.style.bottom = (100 - y) + '%';
+  n.style.width = w + '%';
+  n.style.marginLeft = (-w / 2) + '%';
+  n.style.zIndex = z;
+}
+// ตำแหน่งเพื่อนที่ยืนรอข้างหลัง: กลุ่มขวา (ระหว่างเรากับมอน) + กลุ่มซ้าย
+const BENCH = [[47, 75], [5, 76], [55, 75], [44, 63], [3, 64], [50, 63], [10, 64], [56, 63], [51, 54]];
+
+function layoutScene() {
+  const f = $('#field'); if (!f || !B) return;
+  const narrow = f.clientWidth < 560;
+  // มอน: แถวหลัง/แถวหน้าบนแท่นขวาบน
+  const ms = liveMons(), n = ms.length;
+  const w = (n <= 2 ? 16 : n <= 4 ? 13.5 : n <= 6 ? 11.5 : 10) * (narrow ? 1.15 : 1);
+  const boss = ms.find(m => m.boss);
+  const rest = ms.filter(m => m !== boss);
+  const row = (list, y, x0, x1, ww, z) => list.forEach((m, i) => setPos(m, list.length === 1 ? (x0 + x1) / 2 : x0 + (x1 - x0) * i / (list.length - 1), y, ww, z));
+  if (boss) {
+    setPos(boss, 74, 51, narrow ? 27 : 22, 30);
+    const back = rest.slice(0, 4), sides = rest.slice(4);
+    row(back, 41, 58, 90, w * 0.85, 20);
+    sides.forEach((m, i) => setPos(m, i % 2 ? 93 : 55, 52, w * 0.9, 31));
+  } else {
+    const front = rest.filter((_, i) => i % 2 === 0), back = rest.filter((_, i) => i % 2 === 1);
+    row(back, 41.5, back.length > 1 ? 59 : 74, back.length > 1 ? 89 : 74, w * 0.88, 20);
+    row(front, 51, front.length > 1 ? 56 : 74, front.length > 1 ? 92 : 74, w, 30);
+  }
+  // ปาร์ตี้: ตัวที่โฟกัสยืนใหญ่ข้างหน้า (มองจากด้านหลัง) คนอื่นยืนเล็กๆ ข้างหลัง
+  const hero = heroOf();
+  setPos(hero, 27, 90, narrow ? 33 : 27, 90);
+  unitNode(hero)?.classList.add('hero');
+  const bw = narrow ? 11 : 8.5;
+  S.players.filter(p => p !== hero).forEach((p, i) => {
+    const [x, y] = BENCH[i % BENCH.length];
+    setPos(p, x, y, bw, Math.round(y) - 10);
+    unitNode(p)?.classList.remove('hero');
+  });
+}
+
+function hpBar(v, max, kind) {
+  const r = clamp(v / max, 0, 1);
+  const col = kind === 'sp' ? 'sp' : r > 0.5 ? 'hi' : r > 0.2 ? 'mid' : 'low';
+  return `<div class="ib-bar ${col}"><i style="width:${(r * 100).toFixed(1)}%"></i></div>`;
+}
+
+function renderInfo() {
+  const e = $('#iboxE'), pb = $('#iboxP'), mb = $('#msgbox'); if (!e || !B) return;
+  const ms = liveMons(), m = focusMon();
+  e.innerHTML = m ? `<div class="ib-top"><b>${esc(m.name)}</b><span class="ib-lv">Lv${m.lv}</span></div>
+    <div class="ib-hp"><span>HP</span>${hpBar(m.hp, m.maxHp)}</div>
+    <div class="ib-sub">${effIcons(m)}${ms.length > 1 ? `<small>มอนเหลือ ${ms.length} ตัว</small>` : ''}</div>` : '';
+  e.style.visibility = m ? 'visible' : 'hidden';
+  const h = heroOf(), d = derive(h), J = JOBS[h.job];
+  pb.style.setProperty('--c', h.color);
+  pb.innerHTML = `<div class="ib-top"><b>${esc(h.name)}</b><span class="ib-job">${J.icon}</span><span class="ib-lv">Lv${h.lv}</span></div>
+    <div class="ib-hp"><span>HP</span>${hpBar(h.hp, d.maxHp)}</div><div class="ib-num">${Math.round(h.hp)} / ${d.maxHp}</div>
+    <div class="ib-hp"><span class="sp">SP</span>${hpBar(h.sp, d.maxSp, 'sp')}</div><div class="ib-num">${Math.round(h.sp)} / ${d.maxSp}</div>
+    <div class="ib-sub">${effIcons(h)}${h.dead ? '<small>🪦 ตายแล้ว</small>' : ''}</div>`;
+  // กล่องข้อความ: ถามคำสั่งตอนถึงตาผู้เล่น (นอกนั้นแสดงเหตุการณ์ล่าสุดจาก log)
+  const a = B.actor;
+  const waiting = a && isP(a) && !B.busy && (NET.mode === 'client' ? B.waiting === a.id : !!B.done);
+  if (waiting && mb) {
+    const pend = B.pending ? (B.pending === 'attack' ? ATTACK : SKILLS[B.pending]) : null;
+    mb.innerHTML = pend
+      ? `🎯 เลือกเป้าหมายให้ <b>${pend.name}</b> ${pend.target === 'ally' ? '(แตะเพื่อน)' : '(แตะมอนสเตอร์)'}`
+      : `จะให้ <b style="color:${a.color}">${esc(a.name)}</b> ทำอะไร?`;
+  }
 }
 
 function effIcons(u) {
@@ -898,6 +986,8 @@ function refreshAll() {
     if (p.dead) { n.querySelector('.u-hp i').style.width = '0%'; n.classList.remove('active'); }
   });
   $('#cards').innerHTML = S.players.map(p => playerCard(p, 'compact')).join('');
+  layoutScene();
+  renderInfo();
   renderTimeline();
   renderAction();
   if (B.pending) markTargets((B.pending === 'attack' ? ATTACK : SKILLS[B.pending]).target === 'ally' ? 'ally' : 'enemy');
@@ -953,7 +1043,6 @@ function renderAction() {
     return;
   }
   const lock = !canControl(u);
-  const minCost = minSkillCost(u);
   const pend = B.pending ? (B.pending === 'attack' ? ATTACK : SKILLS[B.pending]) : null;
   const skBtn = (k, s) => {
     const locked = s.lv && s.lv > u.lv, left = cdLeft(u, k);
@@ -976,7 +1065,7 @@ function renderAction() {
       ${skBtn('attack', ATTACK)}
       ${J.skills.map(k => skBtn(k, SKILLS[k])).join('')}
       <button class="skill" data-act="defend" ${lock ? 'disabled' : ''}><span class="s-ico">🛡️</span><span class="s-txt"><b>ป้องกัน</b><small><span class="cost">ฟรี</span><span class="desc"> · ลดดาเมจครึ่ง + ฟื้น SP</span></small></span></button>
-      <button class="skill drink" data-act="drink" ${lock || u.sp >= minCost ? 'disabled' : ''}><span class="s-ico">🍺</span><span class="s-txt"><b>ยก ¼ แก้ว</b><small><span class="cost">+10 SP</span><span class="desc"> (ใช้ได้เมื่อ SP ไม่พอใช้สกิล)</span></small></span></button>
+      <button class="skill drink" data-act="drink" ${lock || u.sp >= d.maxSp ? 'disabled' : ''}><span class="s-ico">🍺</span><span class="s-txt"><b>ยก ¼ แก้ว</b><small><span class="cost">+10 SP</span><span class="desc"> · กดเติมได้ทุกเมื่อ ไม่จบเทิร์น</span></small></span></button>
     </div>`;
 }
 
@@ -1045,6 +1134,7 @@ const callout = V('callout', async (u, text) => {
 });
 
 const log = V('log', html => {
+  const mb = $('#msgbox'); if (mb) mb.innerHTML = html;
   const el = $('#blog'); if (!el) return;
   const d = document.createElement('div');
   d.innerHTML = html;
