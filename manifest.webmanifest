@@ -1,0 +1,13 @@
+{
+  "name": "Monster Drink Battle",
+  "short_name": "Drink Battle",
+  "description": "เกมปาร์ตี้ลงดันเจี้ยน 2–10 คน ตายยก 1 แก้ว มานาหมดยก ¼ แก้ว",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#120e1f",
+  "theme_color": "#120e1f",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
