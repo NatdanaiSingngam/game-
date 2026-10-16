@@ -128,7 +128,7 @@ function renderSetup() {
         <li>เทิร์นนับตาม <b>SPD</b> (AGI สูง = ได้เล่นถี่) ดูลำดับได้ที่แถบด้านบนสนาม</li>
         <li>สกิลมี <b>คูลดาวน์</b> ใช้แล้วต้องรอตามจำนวนเทิร์น · จำนวนมอนเพิ่มตามขนาดปาร์ตี้ (8 คน ≈ 6 ตัว)</li>
         <li>เลเวลอัพได้ <b>+3 แต้มสเตตัส</b> กดที่การ์ดผู้เล่นเพื่ออัพ STR / AGI / VIT / INT / DEX / LUK</li>
-        <li>💀 <b>HP หมด</b> → ยก 1 แก้ว แล้ว<b>นอนตายจนกว่าจะลงชั้นถัดไป</b> (ตายหมดทีม = ยกเพิ่มคนละ ½ แก้ว) · 💧 <b>มานาหมด (SP เหลือ 0)</b> → ยก ¼ แก้ว ได้ +10 SP · ถ้า SP ไม่พอใช้สกิล จะกดยก ¼ แก้วเติมเองก็ได้</li>
+        <li>💀 <b>HP หมด</b> → ยก 1 แก้ว แล้ว<b>นอนตายจนกว่าจะลงชั้นถัดไป</b> (ตายหมดทีม = ยกเพิ่มคนละ ½ แก้ว) · 💧 <b>มานาหมด (SP เหลือ 0)</b> → ยก ¼ แก้ว ได้ +10 SP · SP ไม่พอก็<b>ฝืนใช้สกิลได้</b> แต่ SP จะหมดเกลี้ยงแล้วต้องยก</li>
         <li>ดื่มอย่างรับผิดชอบ รู้ลิมิตตัวเอง ห้ามขับขี่ 🚫🚗</li>
       </ul></div></div>
   </section>`;
@@ -540,7 +540,7 @@ function chooseAction(key) {
   if (key === 'defend') return commitAction(p, key, null);
   if (key === 'drink') { if (p.sp < minSkillCost(p)) commitAction(p, key, null); return; }
   const sk = key === 'attack' ? ATTACK : SKILLS[key];
-  if (!sk || (sk.lv && sk.lv > p.lv) || sk.sp > p.sp || cdLeft(p, key) > 0) return;
+  if (!sk || (sk.lv && sk.lv > p.lv) || (sk.sp && p.sp <= 0) || cdLeft(p, key) > 0) return;
   if (sk.target === 'enemy') {
     const ms = liveMons();
     if (ms.length === 1) return commitAction(p, key, ms[0].id);
@@ -565,7 +565,7 @@ function execAction(p, key, targetId) {
   if (key === 'defend') return runAction(() => doDefend(p));
   if (key === 'drink') return voluntaryDrink(p);
   const sk = key === 'attack' ? ATTACK : (JOBS[p.job].skills.includes(key) ? SKILLS[key] : null);
-  if (!sk || (sk.lv && sk.lv > p.lv) || sk.sp > p.sp || cdLeft(p, key) > 0) return;
+  if (!sk || (sk.lv && sk.lv > p.lv) || (sk.sp && p.sp <= 0) || cdLeft(p, key) > 0) return;
   let t = null;
   if (sk.target === 'enemy') { t = liveMons().find(m => m.id === targetId); if (!t) return; }
   if (sk.target === 'ally') { t = S.players.find(x => x.id === targetId && !x.dead); if (!t) return; }
@@ -624,6 +624,7 @@ async function doDefend(p) {
 
 async function useSkill(u, key, target) {
   const sk = key === 'attack' ? ATTACK : SKILLS[key];
+  if (sk.sp && u.sp < sk.sp) log(`⚠️ ${nm(u)} ฝืนร่ายด้วย SP ที่เหลือ ${u.sp} — มานาหมดเกลี้ยง!`);
   if (sk.sp) u.sp = Math.max(0, u.sp - sk.sp);
   setCd(u, key, sk.cd);
   refreshAll();
@@ -956,9 +957,10 @@ function renderAction() {
   const pend = B.pending ? (B.pending === 'attack' ? ATTACK : SKILLS[B.pending]) : null;
   const skBtn = (k, s) => {
     const locked = s.lv && s.lv > u.lv, left = cdLeft(u, k);
-    const dis = lock || locked || s.sp > u.sp || left > 0;
-    const cost = locked ? `🔒 Lv${s.lv}` : left ? `⏳ รอ ${left} เทิร์น` : s.sp ? `${s.sp} SP` : 'ฟรี';
-    return `<button class="skill ${locked ? 'locked' : ''} ${left && !locked ? 'cooling' : ''} ${B.pending === k ? 'sel' : ''}" data-act="${k}" data-cd="${left}" ${dis ? 'disabled' : ''}>
+    const over = !!s.sp && s.sp > u.sp && u.sp > 0;   // SP ไม่พอ: ใช้ได้แต่ SP จะหมดเกลี้ยง
+    const dis = lock || locked || (s.sp && u.sp <= 0) || left > 0;
+    const cost = locked ? `🔒 Lv${s.lv}` : left ? `⏳ รอ ${left} เทิร์น` : over ? `⚠️ ${s.sp} SP · มานาจะหมด!` : s.sp ? `${s.sp} SP` : 'ฟรี';
+    return `<button class="skill ${locked ? 'locked' : ''} ${left && !locked ? 'cooling' : ''} ${over && !left && !locked ? 'overcast' : ''} ${B.pending === k ? 'sel' : ''}" data-act="${k}" data-cd="${left}" ${dis ? 'disabled' : ''}>
       <span class="s-ico">${s.icon}</span><span class="s-txt"><b>${s.name}</b><small><span class="cost">${cost}</span><span class="desc"> · ${s.desc}${s.cd ? ` · CD ${s.cd}` : ''}</span></small></span></button>`;
   };
   el.style.setProperty('--c', u.color);
